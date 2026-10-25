@@ -18,6 +18,13 @@ window.CONFIG = {
   LINE_OA_ID: "",      // e.g. "@yourshop"
   ORDER_EMAIL: "",     // e.g. "orders@yourshop.com"
 
+  // Prices. Leave empty to use the sample prices in this file (shown with a "sample" badge).
+  // Later, point this at your database (for example a Supabase REST view or an edge function)
+  // that returns JSON like {"materials":{"bamboo":{"base":8,"perCm":0.5}},"handles":{"foam":{"price":15}},
+  // "lines":{"cotton":{"perCm":0.12}},"hooks":{"ring":{"price":3}},"toys":{"fish":{"price":25}},
+  // "extras":{"glue":{"price":45}},"tipFit":{"price":4}}. Anything it omits keeps the sample price.
+  PRICES_URL: "",
+
   ASSEMBLY_FEE: 59,    // THB, per wand we assemble
   SHIPPING_FEE: 40,    // THB, flat
   MAX_ATTACH: 6,       // max toys on the line
@@ -149,9 +156,9 @@ window.CATALOG = {
     name: { th: "ห่วงเกลียวติดปลายก้าน", en: "Screw eye for the rod tip" } },
 
   extras: [
-    { id: "glue", kw: "กาวร้อน ปืนกาว",
+    { id: "glue", price: 45, kw: "กาวร้อน ปืนกาว",
       name: { th: "กาวร้อนและปืนกาว", en: "Hot glue and gun" } },
-    { id: "pliers", kw: "คีมปากจิ้งจก คีมหนีบ ปากแหลม",
+    { id: "pliers", price: 80, kw: "คีมปากจิ้งจก คีมหนีบ ปากแหลม",
       name: { th: "คีมปากแหลม (ปิดห่วงและตะขอ)", en: "Needle-nose pliers (to close rings and hooks)" } }
   ]
 };

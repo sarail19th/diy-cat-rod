@@ -54,6 +54,12 @@ The Shopee list shows a small drawn icon for each part. Shopee product photos ca
 
 Toys attach to the line with a connector you choose (knot, key ring, lobster clasp or swivel). Each connector weighs a little and is counted at the tip, along with a small screw eye (`tipFit`) on the rod tip that the line ties to.
 
+## Prices and cat safety
+
+Each part shows a greyed, read-only price box, and a cost estimate (DIY, without glue, pliers or shop shipping) sits under the gauges. Prices are sample data from `data.js` and show a "sample data" badge. Set `PRICES_URL` in `data.js` to a JSON endpoint from your database and those prices replace the samples (see the comment there for the shape); if the call fails the samples stay.
+
+The cat safety list changes with the build: braided nylon, metal rings, clasps and swivels, wire and plastic-tube rods, and small toy parts each raise a warning, and soft cotton cord is recommended. Source on string and thread swallowing: VCA Animal Hospitals, "Linear Foreign Body in Cats".
+
 ## How the size guide works
 
 - The picture is drawn at 1 unit = 1 cm. The person is a simple figure scaled to the chosen height, the cat is a typical cat (about 40 cm chest to rump) scaled for kitten or large.

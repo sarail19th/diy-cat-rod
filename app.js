@@ -84,6 +84,48 @@
     state.items.forEach(function (it) { it.at = it.at >= old ? v : Math.min(it.at, v); });
   }
 
+  /* ---------------- prices (sample data now, database later) ---------------- */
+  var priceLive = false;
+  function priceOf(kind, id) {
+    if (kind === "mat") { var m = find(D.materials, id); return Math.round(m.base + m.perCm * state.length); }
+    if (kind === "handle") return find(D.handles, id).price;
+    if (kind === "line") return Math.round(find(D.lines, id).perCm * state.strLen);
+    if (kind === "hook") return find(D.hooks, id).price;
+    if (kind === "toy") return find(D.toys, id).price;
+    if (kind === "extra") return find(D.extras, id).price;
+    return 0;
+  }
+  function priceBoxText(n, per) { return "฿ " + n + (per ? " " + t("perPiece") : ""); }
+
+  // Merge prices from the database into the sample catalog. If the call fails the sample prices stay.
+  function loadPrices() {
+    if (!C.PRICES_URL || !window.fetch) return;
+    fetch(C.PRICES_URL).then(function (r) { return r.json(); }).then(function (j) {
+      ["materials", "handles", "lines", "hooks", "toys", "extras"].forEach(function (g) {
+        var src = j[g] || {};
+        D[g].forEach(function (it) { if (src[it.id]) for (var k in src[it.id]) it[k] = src[it.id][k]; });
+      });
+      if (j.tipFit) for (var k in j.tipFit) D.tipFit[k] = j.tipFit[k];
+      priceLive = true;
+      update(false);
+    }).catch(function () { /* keep the sample prices */ });
+  }
+
+  /* ---------------- cat safety ---------------- */
+  function safetyItems(c) {
+    var warn = [], tip = [], small = false;
+    state.items.forEach(function (it) { if (it.id === "bell" || it.id === "pompom" || it.id === "feather") small = true; });
+    function add(list, key) { list.push({ title: t(key + "_t"), text: t(key) }); }
+    if (state.strType === "braid") add(warn, "s_braid"); else add(tip, "s_cotton");
+    if (c.hk.g) { add(warn, "s_metal"); if (c.hk.id === "clip") add(warn, "s_clip"); }
+    if (state.material === "wire") add(warn, "s_wire");
+    if (state.material === "tube") add(warn, "s_tube");
+    if (state.material === "bamboo" || state.material === "wood") add(tip, "s_wood");
+    if (small) add(warn, "s_small");
+    add(tip, "s_always");
+    return { warn: warn, tip: tip };
+  }
+
   /* ---------------- physics ---------------- */
   // Weight per cm and stiffness of a rod from its real size and typical material values.
   function rodSpec(m, d) {
@@ -175,10 +217,11 @@
       rows.push({ label: nm(c.hk) + " × " + s.items.length, v: c.hk.price * s.items.length });
       rows.push({ label: nm(D.tipFit), v: D.tipFit.price });
     }
+    var diy = rows.reduce(function (a, r) { return a + r.v; }, 0);
     rows.push({ label: t("assembly"), v: C.ASSEMBLY_FEE });
     rows.push({ label: t("shipping"), v: C.SHIPPING_FEE });
     var sum = rows.reduce(function (a, r) { return a + r.v; }, 0);
-    return { rows: rows, total: sum };
+    return { rows: rows, total: sum, diy: diy };
   }
 
   function countBy(s) {
@@ -494,8 +537,8 @@
     setText("#stageToggle", picHidden ? t("showPic") : t("hidePic"));
     setText("#gRodLabel", t("gRod"));
     setText("#gWristLabel", t("gWrist"));
-    setText("#vRodL", t("chkRod") + " "); setText("#vWristL", t("chkWrist") + " "); setText("#vGripL", t("chkGrip") + " ");
-    ["s1", "s2", "s3", "s4", "s5", "lenLabel", "matLabel", "thickLabel", "lineLenLabel", "hModeLabel", "hookLabel", "hookNote", "lineTypeLabel", "safety",
+    setText("#vCatL", t("chkCat") + " "); setText("#vRodL", t("chkRod") + " "); setText("#vWristL", t("chkWrist") + " "); setText("#vGripL", t("chkGrip") + " ");
+    ["s1", "s2", "s3", "s4", "s5", "lenLabel", "matLabel", "thickLabel", "lineLenLabel", "hModeLabel", "hookLabel", "hookNote", "lineTypeLabel", "safetyTitle", "safeSrcL", "estTitle", "estNote", "estMoreS",
       "nameLabel", "myDesignsTitle", "shopeeIntro", "partsTitle", "suppliesTitle", "stepsTitle", "affiliateNote",
       "priceTitle", "priceNote", "foot", "sizeTitle", "sizeIntro", "personLabel", "catLabel", "hlLabel", "itemsTitle",
       "whySummary", "why1", "why2", "why3", "why5", "whySources"].forEach(function (k) {
@@ -527,7 +570,8 @@
     if (small === undefined) small = o.feel ? o.feel[lang] : "";
     return '<label class="opt"><input type="radio" name="' + name + '" value="' + o.id + '">' + (o.color ? '<span class="swatch" style="background:' + o.color + '"></span>' : "") +
       '<span class="optText"><b>' + esc(nm(o)) + "</b>" + (small ? "<small>" + esc(small) + "</small>" : "") + "</span>" +
-      '<span class="w" data-w="' + kind + ":" + o.id + '"></span></label>';
+      '<span class="side"><span class="w" data-w="' + kind + ":" + o.id + '"></span>' +
+      (kind === "mat" || kind === "handle" || kind === "line" || kind === "hook" ? '<span class="priceBox" data-p="' + (kind === "mat" ? "mat" : kind) + ":" + o.id + '" aria-disabled="true"></span>' : "") + "</span></label>";
   }
 
   function buildLists() {
@@ -548,7 +592,7 @@
     }).join("");
     $("#toyGrid").innerHTML = D.toys.map(function (o) {
       return '<div class="toy" data-toy="' + o.id + '"><svg viewBox="-26 -2 52 54" aria-hidden="true">' + TOY[o.id] + "</svg>" +
-        "<b>" + esc(nm(o)) + '</b><small data-w="toy:' + o.id + '"></small>' +
+        "<b>" + esc(nm(o)) + '</b><small data-w="toy:' + o.id + '"></small><span class="priceBox" data-p="toy:' + o.id + '" aria-disabled="true"></span>' +
         '<div class="stepper"><button type="button" data-act="dec" data-id="' + o.id + '" aria-label="' + esc(t("remove", { name: nm(o) })) + '"><span aria-hidden="true">−</span></button>' +
         '<span data-qty="' + o.id + '">0</span>' +
         '<button type="button" data-act="inc" data-id="' + o.id + '" aria-label="' + esc(t("add", { name: nm(o) })) + '"><span aria-hidden="true">+</span></button></div></div>';
@@ -638,6 +682,13 @@
       ws[i].textContent = txt;
     }
 
+    var pbs = document.querySelectorAll("[data-p]");
+    for (i = 0; i < pbs.length; i++) {
+      var pp = pbs[i].getAttribute("data-p").split(":"), pv = priceOf(pp[0], pp[1]);
+      pbs[i].textContent = priceBoxText(pv, pp[0] === "hook" && pv > 0);
+      pbs[i].setAttribute("aria-label", t("priceBoxAria", { p: pv }));
+    }
+
     var counts = countBy(state), full = c.n >= C.MAX_ATTACH;
     D.toys.forEach(function (toy) {
       var q = counts[toy.id] || 0, card = document.querySelector('[data-toy="' + toy.id + '"]');
@@ -676,6 +727,19 @@
     $("#pill").setAttribute("data-level", ev.worst);
     setText("#pill", ev.worst === "bad" ? t("pillBad") : ev.worst === "warn" ? t("pillWarn") : t("pillGood"));
 
+    var est = prices(state);
+    setText("#estTotal", "฿ " + est.diy);
+    $("#estTotal").setAttribute("aria-label", t("priceBoxAria", { p: est.diy }));
+    setText("#estBadge", priceLive ? t("estBadgeLive") : t("estBadge"));
+    $("#estBody").innerHTML = est.rows.filter(function (r) { return r.label !== t("assembly") && r.label !== t("shipping"); }).map(function (r) {
+      return "<tr><td>" + esc(r.label) + "</td><td>" + r.v + " " + esc(t("baht")) + "</td></tr>";
+    }).join("");
+
+    var sf = safetyItems(c);
+    $("#safeList").innerHTML = sf.warn.map(function (x) { return '<li data-level="warn"><b>' + esc(x.title) + "</b> " + esc(x.text) + "</li>"; }).join("") +
+      sf.tip.map(function (x) { return '<li data-level="tip"><b>' + esc(x.title) + "</b> " + esc(x.text) + "</li>"; }).join("");
+    setCheck("vCat", sf.warn.length ? { lv: "warn", text: t("vCatWarn", { n: sf.warn.length, first: sf.warn[0].title }) } : { lv: "good", text: t("vCatGood") });
+
     renderParts(c);
     renderPrice();
     renderSaved();
@@ -686,27 +750,28 @@
   /* ---------------- finish panes ---------------- */
   function shopeeUrl(kw) { return C.SHOPEE_LINK_TEMPLATE.replace("{kw}", encodeURIComponent(kw)); }
 
-  function partRow(key, name, spec, kw, icon) {
+  function partRow(key, name, spec, kw, icon, price) {
     return '<li><input type="checkbox" data-chk="' + esc(key) + '"' + (checked[key] ? " checked" : "") + ' aria-label="' + esc(name) + '">' + (icon || "") +
       '<span class="pt">' + esc(name) + (spec ? "<small>" + esc(spec) + "</small>" : "") + "</span>" +
+      (price === undefined ? "" : '<span class="priceBox" aria-disabled="true" aria-label="' + esc(t("priceBoxAria", { p: price })) + '">฿ ' + price + "</span>") +
       '<a class="btn" href="' + esc(shopeeUrl(kw)) + '" target="_blank" rel="noopener sponsored">' + esc(t("searchShopee")) + "</a></li>";
   }
 
   function renderParts(c) {
     var rows = [], counts = countBy(state);
-    rows.push(partRow("rod-" + c.m.id + "-" + state.rodD, t("rodPart", { mat: nm(c.m), d: state.rodD }), t("cutTo", { len: state.length }), c.m.kw.split("{d}").join(state.rodD), iconSvg("rod", c.m, c.m)));
-    if (!c.h.bare) rows.push(partRow("handle-" + c.h.id, t("handleLine", { handle: nm(c.h) }), t(c.joined ? "handlePartJoined" : "handlePartSpec", { len: state.handleLen }), c.h.kw, iconSvg("handle", c.h, c.h)));
-    rows.push(partRow("line-" + c.ln.id, nm(c.ln), t("lenOnly", { len: state.strLen }), c.ln.kw, iconSvg("line", c.ln, c.ln)));
+    rows.push(partRow("rod-" + c.m.id + "-" + state.rodD, t("rodPart", { mat: nm(c.m), d: state.rodD }), t("cutTo", { len: state.length }), c.m.kw.split("{d}").join(state.rodD), iconSvg("rod", c.m, c.m), priceOf("mat", c.m.id)));
+    if (!c.h.bare) rows.push(partRow("handle-" + c.h.id, t("handleLine", { handle: nm(c.h) }), t(c.joined ? "handlePartJoined" : "handlePartSpec", { len: state.handleLen }), c.h.kw, iconSvg("handle", c.h, c.h), priceOf("handle", c.h.id)));
+    rows.push(partRow("line-" + c.ln.id, nm(c.ln), t("lenOnly", { len: state.strLen }), c.ln.kw, iconSvg("line", c.ln, c.ln), priceOf("line", c.ln.id)));
     if (c.hk.g) {
-      rows.push(partRow("hook-" + c.hk.id, nm(c.hk), t("pieces", { q: c.n }) + " " + t("hookPerToy"), c.hk.kw, iconSvg("hook", c.hk, c.hk.id)));
-      rows.push(partRow("tipfit", nm(D.tipFit), t("tipFitSpec"), D.tipFit.kw, iconSvg("tipfit", D.tipFit)));
+      rows.push(partRow("hook-" + c.hk.id, nm(c.hk), t("pieces", { q: c.n }) + " " + t("hookPerToy"), c.hk.kw, iconSvg("hook", c.hk, c.hk.id), c.hk.price * c.n));
+      rows.push(partRow("tipfit", nm(D.tipFit), t("tipFitSpec"), D.tipFit.kw, iconSvg("tipfit", D.tipFit), D.tipFit.price));
     }
     D.toys.forEach(function (toy) {
       var q = counts[toy.id] || 0;
-      if (q) rows.push(partRow("toy-" + toy.id, nm(toy), t("pieces", { q: q }), toy.kw, iconSvg("toy", toy, toy.id)));
+      if (q) rows.push(partRow("toy-" + toy.id, nm(toy), t("pieces", { q: q }), toy.kw, iconSvg("toy", toy, toy.id), toy.price * q));
     });
     $("#partsList").innerHTML = rows.join("");
-    $("#suppliesList").innerHTML = D.extras.map(function (e) { return partRow("x-" + e.id, nm(e), "", e.kw, iconSvg(e.id, e)); }).join("");
+    $("#suppliesList").innerHTML = D.extras.map(function (e) { return partRow("x-" + e.id, nm(e), "", e.kw, iconSvg(e.id, e), e.price); }).join("");
     $("#assembleList").innerHTML = ["as1", "as2", "as3", "as4"].map(function (k) { return "<li>" + esc(t(k, { len: state.length })) + "</li>"; }).join("");
   }
 
@@ -924,7 +989,7 @@
     function range(sel, r) { var el = $(sel); el.min = r.min; el.max = r.max; el.step = r.step; }
     range("#lenRange", D.length); range("#lineRange", D.line);
     range("#hlRange", D.handleLen); range("#personRange", D.person);
-    buildStatic(); buildLists(); bind(); update(true);
+    buildStatic(); buildLists(); bind(); update(true); loadPrices();
   }
   init();
 })();
