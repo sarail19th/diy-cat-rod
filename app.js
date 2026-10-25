@@ -198,8 +198,8 @@
   }
 
   var TOY = {
-    fish: '<g transform="translate(0,17) rotate(90)"><path d="M12 0 L25 -10 L25 10Z" fill="#F4B63F" stroke="#B5822A" stroke-width="1"/><path d="M-16 0 C-8 -12 8 -12 14 0 C8 12 -8 12 -16 0Z" fill="#F4B63F" stroke="#B5822A" stroke-width="1"/><circle cx="-8" cy="-3" r="1.9" fill="#2C3527"/><path d="M-1 -8 Q3 0 -1 8" fill="none" stroke="#2C3527" stroke-width="1.2" stroke-dasharray="2 2"/></g>',
-    mouse: '<g transform="translate(0,15) rotate(90)"><path d="M14 0 Q27 -9 33 4" fill="none" stroke="#E58FA3" stroke-width="2.2" stroke-linecap="round"/><ellipse rx="15" ry="9.5" fill="#C9CED8" stroke="#8D95A8" stroke-width="1"/><circle cx="-5" cy="-9" r="5" fill="#F2A6B8" stroke="#8D95A8" stroke-width="1"/><circle cx="-5" cy="9" r="5" fill="#F2A6B8" stroke="#8D95A8" stroke-width="1"/><circle cx="-10" cy="-3" r="1.6" fill="#2C3527"/><circle cx="-15" cy="0" r="2" fill="#E8547A"/></g>',
+    fish: '<g transform="translate(0,17) rotate(90)"><path d="M12 0 L25 -10 L25 10Z" fill="#F4B63F" stroke="#B5822A" stroke-width="1"/><path d="M-16 0 C-8 -12 8 -12 14 0 C8 12 -8 12 -16 0Z" fill="#F4B63F" stroke="#B5822A" stroke-width="1"/><circle cx="-8" cy="-3" r="1.9" fill="#3A2E20"/><path d="M-1 -8 Q3 0 -1 8" fill="none" stroke="#3A2E20" stroke-width="1.2" stroke-dasharray="2 2"/></g>',
+    mouse: '<g transform="translate(0,15) rotate(90)"><path d="M14 0 Q27 -9 33 4" fill="none" stroke="#E58FA3" stroke-width="2.2" stroke-linecap="round"/><ellipse rx="15" ry="9.5" fill="#C9CED8" stroke="#8D95A8" stroke-width="1"/><circle cx="-5" cy="-9" r="5" fill="#F2A6B8" stroke="#8D95A8" stroke-width="1"/><circle cx="-5" cy="9" r="5" fill="#F2A6B8" stroke="#8D95A8" stroke-width="1"/><circle cx="-10" cy="-3" r="1.6" fill="#3A2E20"/><circle cx="-15" cy="0" r="2" fill="#E8547A"/></g>',
     feather: '<g transform="translate(0,2)"><path transform="rotate(-20)" d="M0 0 C-8 10 -7 26 0 36 C7 26 8 10 0 0Z" fill="#F6F7FB"/><path transform="rotate(20)" d="M0 0 C-8 10 -7 26 0 36 C7 26 8 10 0 0Z" fill="#F4B63F"/><path d="M0 0 C-8 10 -7 26 0 38 C7 26 8 10 0 0Z" fill="#E8547A"/><path d="M0 2 L0 36" stroke="#8E2442" stroke-width="1"/></g>',
     bell: '<circle cx="0" cy="1.5" r="1.8" fill="none" stroke="#9A6E12" stroke-width="1.2"/><circle cx="0" cy="11" r="8" fill="#E3A92B" stroke="#9A6E12" stroke-width="1"/><path d="M-8 12 H8" stroke="#9A6E12" stroke-width="1.4"/><circle cx="0" cy="14.5" r="1.5" fill="#9A6E12"/><ellipse cx="-3" cy="7" rx="2" ry="3" fill="#fff" opacity=".5"/>',
     ribbon: '<circle cx="0" cy="2" r="2.4" fill="#F4B63F"/><path d="M-1 3 C-10 12 6 20 -3 30 C-7 36 -1 40 -3 46" fill="none" stroke="#E8547A" stroke-width="5" stroke-linecap="round"/><path d="M2 3 C8 10 -2 18 6 27 C9 32 5 36 7 40" fill="none" stroke="#F4B63F" stroke-width="4" stroke-linecap="round"/>',
@@ -280,7 +280,7 @@
       for (i = 0; i < 20; i++) o += '<path d="M' + (-hpx - 10 + i * 9) + ' ' + h + ' L' + (-hpx - 10 + i * 9 + w) + ' ' + -h + '" stroke="rgba(255,255,255,.4)" stroke-width="2"/>';
     } else if (id === "cord") {
       step = 8;
-      for (i = 0; i < 18; i++) o += '<path d="M' + (-hpx - 10 + i * step) + ' ' + h + ' L' + (-hpx - 10 + i * step + step) + ' ' + -h + ' M' + (-hpx - 10 + i * step) + ' ' + -h + ' L' + (-hpx - 10 + i * step + step) + ' ' + h + '" stroke="rgba(44,53,39,.35)" stroke-width="1.5" fill="none"/>';
+      for (i = 0; i < 18; i++) o += '<path d="M' + (-hpx - 10 + i * step) + ' ' + h + ' L' + (-hpx - 10 + i * step + step) + ' ' + -h + ' M' + (-hpx - 10 + i * step) + ' ' + -h + ' L' + (-hpx - 10 + i * step + step) + ' ' + h + '" stroke="rgba(58,46,32,.35)" stroke-width="1.5" fill="none"/>';
     } else if (id === "silicone") {
       for (i = 1; i < 12; i++) o += '<line x1="' + (-hpx + i * hpx / 12).toFixed(1) + '" y1="' + -h + '" x2="' + (-hpx + i * hpx / 12).toFixed(1) + '" y2="' + h + '" stroke="rgba(255,255,255,.35)" stroke-width="1.2"/>';
     } else if (id === "plastic") {
@@ -401,17 +401,17 @@
     return { lo: lo, hi: hi, mid: mid };
   }
 
-  var CAT_SVG = '<g fill="#7A5238"><ellipse cx="0" cy="-17" rx="20" ry="9"/><rect x="-17" y="-15" width="5.5" height="15" rx="2.7"/><rect x="-10" y="-15" width="5.5" height="15" rx="2.7"/><ellipse cx="13" cy="-12" rx="7.5" ry="8.5"/><rect x="9.5" y="-7" width="5.5" height="7" rx="2.7"/><rect x="15.5" y="-7" width="5.5" height="7" rx="2.7"/><circle cx="-24" cy="-28" r="8.5"/><path d="M-31 -31 L-30 -41 L-23.5 -35Z"/><path d="M-24.5 -35.5 L-18.5 -40 L-17.5 -31.5Z"/><path d="M19 -20 C30 -22 34 -34 28 -42" fill="none" stroke="#7A5238" stroke-width="4" stroke-linecap="round"/></g><circle cx="-28" cy="-29" r="1.4" fill="#fff"/>';
+  var CAT_SVG = '<g fill="#B8693A"><ellipse cx="0" cy="-17" rx="20" ry="9"/><rect x="-17" y="-15" width="5.5" height="15" rx="2.7"/><rect x="-10" y="-15" width="5.5" height="15" rx="2.7"/><ellipse cx="13" cy="-12" rx="7.5" ry="8.5"/><rect x="9.5" y="-7" width="5.5" height="7" rx="2.7"/><rect x="15.5" y="-7" width="5.5" height="7" rx="2.7"/><circle cx="-24" cy="-28" r="8.5"/><path d="M-31 -31 L-30 -41 L-23.5 -35Z"/><path d="M-24.5 -35.5 L-18.5 -40 L-17.5 -31.5Z"/><path d="M19 -20 C30 -22 34 -34 28 -42" fill="none" stroke="#B8693A" stroke-width="4" stroke-linecap="round"/></g><circle cx="-28" cy="-29" r="1.4" fill="#fff"/>';
 
   function renderScale(c) {
     var h = state.person, L = state.length, hl = state.handleLen, cat = find(D.cats, state.cat), k = cat.k;
-    var ink = "#2C3527", soft = "#55604B", i, s = "";
+    var ink = "#3A2E20", soft = "#6A5A44", i, s = "";
     var font = 'style="font-family:var(--font-body)"';
 
     // floor and 50 cm grid
-    s += '<rect x="-50" y="0" width="300" height="16" fill="rgba(44,53,39,.07)"/>';
+    s += '<rect x="-50" y="0" width="300" height="16" fill="rgba(58,46,32,.07)"/>';
     for (i = 50; i <= 200; i += 50) {
-      s += '<line x1="-50" y1="' + -i + '" x2="250" y2="' + -i + '" stroke="rgba(44,53,39,.22)" stroke-width=".6" stroke-dasharray="3 3"/>' +
+      s += '<line x1="-50" y1="' + -i + '" x2="250" y2="' + -i + '" stroke="rgba(58,46,32,.22)" stroke-width=".6" stroke-dasharray="3 3"/>' +
         '<text x="-48" y="' + (-i + 8) + '" font-size="7.5" fill="' + soft + '" ' + font + ">" + i + "</text>";
     }
     s += '<line x1="-50" y1="0" x2="250" y2="0" stroke="' + ink + '" stroke-width=".8"/>';
@@ -432,9 +432,9 @@
     var bx = hx - hl * ca, by = hy - hl * sa, fx = hx + 3 * ca, fy = hy + 3 * sa;
     var tx = hx + (c.joined ? L : L - hl) * ca, ty = hy + (c.joined ? L : L - hl) * sa;
     var hw = Math.max(1.6, c.gripD / 10), hcol = c.h.bare ? c.m.color : c.h.color;
-    s += '<line x1="' + bx.toFixed(1) + '" y1="' + by.toFixed(1) + '" x2="' + fx.toFixed(1) + '" y2="' + fy.toFixed(1) + '" stroke="rgba(44,53,39,.55)" stroke-width="' + (hw + 1.2).toFixed(1) + '" stroke-linecap="round"/>' +
+    s += '<line x1="' + bx.toFixed(1) + '" y1="' + by.toFixed(1) + '" x2="' + fx.toFixed(1) + '" y2="' + fy.toFixed(1) + '" stroke="rgba(58,46,32,.55)" stroke-width="' + (hw + 1.2).toFixed(1) + '" stroke-linecap="round"/>' +
       '<line x1="' + bx.toFixed(1) + '" y1="' + by.toFixed(1) + '" x2="' + fx.toFixed(1) + '" y2="' + fy.toFixed(1) + '" stroke="' + hcol + '" stroke-width="' + hw.toFixed(1) + '" stroke-linecap="round"/>' +
-      '<line x1="' + fx.toFixed(1) + '" y1="' + fy.toFixed(1) + '" x2="' + tx.toFixed(1) + '" y2="' + ty.toFixed(1) + '" stroke="rgba(44,53,39,.55)" stroke-width="3" stroke-linecap="round"/>' +
+      '<line x1="' + fx.toFixed(1) + '" y1="' + fy.toFixed(1) + '" x2="' + tx.toFixed(1) + '" y2="' + ty.toFixed(1) + '" stroke="rgba(58,46,32,.55)" stroke-width="3" stroke-linecap="round"/>' +
       '<line x1="' + fx.toFixed(1) + '" y1="' + fy.toFixed(1) + '" x2="' + tx.toFixed(1) + '" y2="' + ty.toFixed(1) + '" stroke="' + c.m.color + '" stroke-width="2" stroke-linecap="round"/>';
 
     // length ruler above the rod
