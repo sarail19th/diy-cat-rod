@@ -89,7 +89,6 @@ button, input, textarea { font: inherit; color: inherit; }
 .stageHead p { font-size: 14px; opacity: 0.92; margin-top: 2px; }
 
 #rod { display: block; width: 100%; height: auto; margin-top: -4px; }
-@media (max-width: 959px) { #rod { max-height: 34vh; } }
 
 .pill {
   position: absolute; right: 22px; top: 20px; z-index: 3;
@@ -101,7 +100,30 @@ button, input, textarea { font: inherit; color: inherit; }
 .pill::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--good); }
 .pill[data-level="warn"]::before { background: var(--warn); }
 .pill[data-level="bad"]::before { background: var(--bad); }
-@media (max-width: 520px) { .pill { position: static; margin: 6px 0 8px 6px; } }
+.stageToggle { display: none; }
+
+/* Phones: a slim sticky preview so options stay visible below it */
+@media (max-width: 959px) {
+  html { scroll-padding-top: calc(env(safe-area-inset-top, 0px) + 30vh); }
+  .stage {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "spec toggle" "pic pic";
+    align-items: center; column-gap: 8px; row-gap: 4px;
+    padding: 10px 14px 8px; border-radius: 20px; outline-offset: -6px;
+  }
+  .stageHead { grid-area: spec; padding: 0 0 0 4px; }
+  .stageHead h1 { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .stageHead p { font-size: 13px; line-height: 1.35; margin: 0; opacity: 1; }
+  .pill { position: static; grid-area: pic; justify-self: start; align-self: start; z-index: 2; margin: 2px 0 0 2px; padding: 6px 10px; font-size: 12px; }
+  .stageToggle {
+    display: inline-block; grid-area: toggle;
+    background: transparent; color: #fff; border: 1.5px solid rgba(255, 255, 255, 0.75);
+    border-radius: 999px; padding: 4px 12px; font-size: 12px; font-weight: 500; cursor: pointer;
+  }
+  #rod { grid-area: pic; max-height: 24vh; margin: 0 auto; }
+  .tapHint { display: none; }
+  .stage[data-collapsed="true"] #rod { display: none; }
+}
 
 .tapHint { font-size: 12px; opacity: 0.8; padding: 0 6px 12px; }
 

@@ -305,6 +305,7 @@
 
   /* ---------------- static + list building ---------------- */
   var checked = {};
+  var picHidden = false;
 
   function setText(id, s) { $(id).textContent = s; }
 
@@ -315,6 +316,7 @@
     setText("#langBtn", t("langBtn"));
     setText("#skip", t("skip"));
     setText("#tapHint", t("tapHint"));
+    setText("#stageToggle", picHidden ? t("showPic") : t("hidePic"));
     setText("#gTipLabel", t("gTip"));
     setText("#gTotalLabel", t("gTotal"));
     ["s1", "s2", "s3", "s4", "s5", "lenLabel", "matLabel", "lineLenLabel", "lineTypeLabel", "safety",
@@ -583,6 +585,13 @@
     });
 
     $("#stage").addEventListener("click", wiggle);
+    $("#stageToggle").addEventListener("click", function (e) {
+      e.stopPropagation();
+      picHidden = !picHidden;
+      $("#stage").setAttribute("data-collapsed", picHidden ? "true" : "false");
+      this.setAttribute("aria-expanded", picHidden ? "false" : "true");
+      setText("#stageToggle", picHidden ? t("showPic") : t("hidePic"));
+    });
     $("#sizeFix").addEventListener("click", function () { state.length = sizeRange(state.person).mid; update(true); });
 
     // tabs
