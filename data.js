@@ -10,7 +10,11 @@ window.CONFIG = {
   // To earn commission, paste your Shopee Affiliate link pattern here.
   SHOPEE_LINK_TEMPLATE: "https://shopee.co.th/search?keyword={kw}",
 
-  // Where orders go. Leave empty to hide that option.
+  // Ordering and home delivery. Keep false until that phase is ready;
+  // the order tab then shows "coming soon". Set true to show prices and the order form.
+  ORDERS_OPEN: false,
+
+  // Where orders go once ORDERS_OPEN is true. Leave empty to hide that option.
   LINE_OA_ID: "",      // e.g. "@yourshop"
   ORDER_EMAIL: "",     // e.g. "orders@yourshop.com"
 

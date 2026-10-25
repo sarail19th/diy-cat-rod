@@ -239,7 +239,11 @@
     });
     setText("#lenMin", D.length.min + " " + t("cm")); setText("#lenMax", D.length.max + " " + t("cm"));
     setText("#lineMin", D.line.min + " " + t("cm")); setText("#lineMax", D.line.max + " " + t("cm"));
-    setText("#tab-save", t("tabSave")); setText("#tab-shopee", t("tabShopee")); setText("#tab-order", t("tabOrder"));
+    setText("#tab-save", t("tabSave")); setText("#tab-shopee", t("tabShopee")); setText("#tab-order", C.ORDERS_OPEN ? t("tabOrder") : t("tabOrderSoon"));
+    $("#orderSoon").hidden = !!C.ORDERS_OPEN;
+    $("#orderLive").hidden = !C.ORDERS_OPEN;
+    setText("#soonTitle", t("soonTitle")); setText("#soonText", t("soonText"));
+    setText("#soonSave", t("soonSave")); setText("#soonShopee", t("soonShopee"));
     setText("#saveBtn", t("save")); setText("#copyLinkBtn", t("copyLink"));
     setText("#fNameL", t("fName")); setText("#fPhoneL", t("fPhone")); setText("#fAddressL", t("fAddress"));
     setText("#fLineL", t("fLine")); setText("#fNoteL", t("fNote"));
@@ -520,6 +524,10 @@
         list.splice(+d.getAttribute("data-del"), 1); setSaved(list); renderSaved(); toast(t("deleted"));
       }
     });
+
+    // coming-soon shortcuts
+    $("#soonSave").addEventListener("click", function () { $("#tab-save").click(); $("#designName").focus(); });
+    $("#soonShopee").addEventListener("click", function () { $("#tab-shopee").click(); });
 
     // order
     $("#orderForm").addEventListener("submit", function (e) { e.preventDefault(); });

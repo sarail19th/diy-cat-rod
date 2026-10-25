@@ -121,6 +121,15 @@
       </div>
 
       <div class="pane" id="pane-order" role="tabpanel" aria-labelledby="tab-order" hidden>
+        <div class="soon" id="orderSoon">
+          <h3 id="soonTitle"></h3>
+          <p id="soonText"></p>
+          <div class="btnRow">
+            <button class="btn btn--primary" id="soonSave" type="button"></button>
+            <button class="btn" id="soonShopee" type="button"></button>
+          </div>
+        </div>
+        <div id="orderLive" hidden>
         <h3 id="priceTitle"></h3>
         <table class="price"><tbody id="priceBody"></tbody></table>
         <p class="fine" id="priceNote"></p>
@@ -137,6 +146,7 @@
             <button class="btn" id="copyOrderBtn" type="button"></button>
           </div>
         </form>
+        </div>
       </div>
     </section>
   </section>

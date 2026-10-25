@@ -6,7 +6,7 @@ When the design is done, the visitor can:
 
 - **Save** it in their browser, or copy a link that reopens the same design.
 - **Buy the parts on Shopee** from a checklist of search links, plus 4 assembly steps.
-- **Order from the shop** with a price estimate and a form that sends the order by LINE or email, or copies it as text.
+- **Order from the shop** (coming soon): the tab shows a "coming soon" note for now. The price estimate and order form are built and switched off. Set `ORDERS_OPEN: true` in `data.js` to show them.
 
 Thai and English, switch with the button in the header.
 
@@ -26,6 +26,7 @@ No build step. Open `index.html` in a browser or host the folder anywhere static
 
 Edit `window.CONFIG` in `data.js`:
 
+- `ORDERS_OPEN`: leave `false` until ordering and shipping are ready.
 - `LINE_OA_ID`: your LINE Official Account ID (for example `@yourshop`). The "Send order on LINE" button only appears when this is set.
 - `ORDER_EMAIL`: shows a "Send order by email" button when set.
 - `SHOPEE_LINK_TEMPLATE`: links currently go to plain Shopee searches. To earn commission, paste your Shopee Affiliate link pattern with `{kw}` where the search keyword goes. A disclosure line appears automatically once you change it.
@@ -43,6 +44,6 @@ Prices in `CATALOG` (`price`, `base`, `perCm`) are placeholders. Replace them wi
 
 All numbers are estimates in `data.js` to help people decide. Adjust them after you weigh your real parts.
 
-## Orders
+## Orders (later phase)
 
-There is no payment system or server. An order is a message with the design, price estimate and shipping details that the visitor sends to your LINE or email. You confirm the price and take payment in chat.
+Ordering is switched off (`ORDERS_OPEN: false`) and the tab says "coming soon". When switched on, there is still no payment system or server. An order is a message with the design, price estimate and shipping details that the visitor sends to your LINE or email. You confirm the price and take payment in chat.

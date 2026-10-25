@@ -49,6 +49,11 @@ window.I18N = {
     tabSave: "บันทึก",
     tabShopee: "ซื้อเองที่ Shopee",
     tabOrder: "สั่งให้ส่งถึงบ้าน",
+    tabOrderSoon: "สั่งให้ส่งถึงบ้าน (เร็วๆ นี้)",
+    soonTitle: "สั่งให้ประกอบและส่งถึงบ้าน เร็วๆ นี้",
+    soonText: "เรากำลังเตรียมระบบสั่งซื้อและจัดส่ง ตอนนี้คุณออกแบบแล้วบันทึกไว้ หรือซื้อชิ้นส่วนเองที่ Shopee ได้เลย",
+    soonSave: "บันทึกแบบนี้",
+    soonShopee: "ดูรายการซื้อที่ Shopee",
 
     nameLabel: "ชื่อแบบ",
     namePh: "เช่น ไม้ของมะม่วง",
@@ -161,6 +166,11 @@ window.I18N = {
     tabSave: "Save",
     tabShopee: "Buy on Shopee",
     tabOrder: "Order from us",
+    tabOrderSoon: "Home delivery (coming soon)",
+    soonTitle: "Ready-made wands with home delivery are coming soon",
+    soonText: "We are building ordering and shipping. For now, save your design or buy the parts yourself on Shopee.",
+    soonSave: "Save this design",
+    soonShopee: "See the Shopee list",
 
     nameLabel: "Design name",
     namePh: "e.g. Mango's wand",
