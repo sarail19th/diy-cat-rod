@@ -20,6 +20,11 @@
 
 <main class="builder">
   <section class="left">
+    <div class="views" id="views" data-view="close">
+    <div class="viewTabs" id="viewTabs" role="group">
+      <button type="button" id="vtClose" aria-pressed="true"></button>
+      <button type="button" id="vtScale" aria-pressed="false"></button>
+    </div>
     <div class="stage" id="stage">
       <div class="stageHead">
         <h1 id="headline"></h1>
@@ -34,6 +39,16 @@
       </div>
       <button class="stageToggle" id="stageToggle" type="button" aria-controls="rod" aria-expanded="true"></button>
       <p class="tapHint" id="tapHint"></p>
+    </div>
+
+    <div class="scaleCard" id="scaleCard">
+      <div class="scaleHead">
+        <h2 id="scaleTitle"></h2>
+        <span class="pill pill--inline" id="sizePill" data-level="good"></span>
+      </div>
+      <svg id="scaleSvg" viewBox="-50 -206 300 222" role="img"></svg>
+      <p class="sizeSummary" id="sizeSummary" aria-live="polite"></p>
+    </div>
     </div>
 
     <div class="gauges">
@@ -107,8 +122,6 @@
     <fieldset class="step sizeStep">
       <legend><span id="sizeTitle"></span></legend>
       <p class="fine intro" id="sizeIntro"></p>
-      <svg id="scaleSvg" viewBox="-50 -206 300 222" role="img"></svg>
-      <p class="sizeSummary" id="sizeSummary" aria-live="polite"></p>
       <p class="verdict" id="sizeVerdict" data-level="good" aria-live="polite"></p>
       <button class="btn" id="sizeFix" type="button" hidden></button>
       <div class="sliderRow">

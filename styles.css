@@ -432,3 +432,49 @@ button, input, textarea { font: inherit; color: inherit; }
 .chip:has(input:checked) { border-color: var(--felt); background: rgba(122, 90, 60, 0.12); box-shadow: inset 0 0 0 1.5px var(--felt); font-weight: 600; }
 .chip:has(input:focus-visible) { outline: 3px solid var(--ink); outline-offset: 2px; }
 .fillNote { display: block; margin-top: 4px; font-size: 12px; color: var(--ink-soft); line-height: 1.4; }
+
+/* ---------- preview and to-scale picture share one place ---------- */
+.stage { position: relative; top: auto; }
+.views { display: block; }
+.viewTabs { display: flex; gap: 6px; margin-bottom: 8px; }
+.viewTabs button {
+  flex: 1; min-height: 36px; padding: 4px 14px; border: 1.5px solid var(--ink); border-radius: 999px;
+  background: var(--cream); font-weight: 500; font-size: 14px; cursor: pointer;
+}
+.viewTabs button[aria-pressed="true"] { background: var(--ink); color: #fff; }
+
+.scaleCard {
+  position: relative; padding: 12px 14px 10px;
+  background: var(--fibres), var(--grain), var(--paper); border: 1.5px solid var(--line); border-radius: var(--card-cut);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset, 0 3px 0 rgba(58, 46, 32, 0.07), 0 12px 22px -12px rgba(58, 46, 32, 0.35);
+}
+.scaleHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.scaleHead h2 { font-size: 16px; }
+.pill--inline { position: static; flex: none; border: 1.5px solid var(--line); box-shadow: none; padding: 6px 10px; font-size: 12px; }
+.scaleCard .sizeSummary { margin: 8px 0 0; font-size: 14px; line-height: 1.45; }
+
+/* narrower than 1240px: one picture at a time, chosen with the toggle */
+.views[data-view="close"] .scaleCard, .views[data-view="scale"] .stage { display: none; }
+@media (max-width: 959px) {
+  .views { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 10; padding-top: 2px; }
+  .viewTabs { margin-bottom: 6px; }
+  .viewTabs button { min-height: 32px; font-size: 13px; padding: 2px 12px; }
+  .scaleCard { padding: 8px 12px 8px; border-radius: 20px; }
+  .scaleHead h2 { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .scaleHead { justify-content: flex-start; }
+  .scaleCard #scaleSvg { max-height: 25vh; margin: 4px auto 0; }
+  .scaleCard .sizeSummary { font-size: 12px; margin-top: 4px; }
+}
+
+/* wide screens: both pictures side by side, no toggle */
+@media (min-width: 1240px) {
+  .top, .builder, .foot { max-width: 1400px; }
+  .viewTabs { display: none; }
+  .views, .views[data-view] { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 14px; align-items: start; }
+  .views[data-view] .stage, .views[data-view] .scaleCard { display: block; }
+  .stage { padding: 20px 22px 8px; }
+  .stageHead h1 { font-size: clamp(22px, 2.2vw, 30px); padding-right: 110px; }
+  .pill { right: 16px; top: 16px; }
+  .stagePrice { right: 16px; bottom: 10px; }
+  .stagePriceL { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+}

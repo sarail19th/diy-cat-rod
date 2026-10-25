@@ -658,6 +658,8 @@
     setText("#sizeVerdict", t(key, { lo: r.lo, hi: r.hi }));
     $("#sizeVerdict").setAttribute("data-level", key === "sizeFit" ? "good" : "warn");
     $("#sizeFix").hidden = key === "sizeFit";
+    $("#sizePill").setAttribute("data-level", key === "sizeFit" ? "good" : "warn");
+    setText("#sizePill", t(key === "sizeFit" ? "sizePillOk" : key === "sizeShort" ? "sizePillShort" : "sizePillLong"));
     setText("#sizeFix", t("sizeFix", { mid: r.mid }));
     setText("#sizeFine", t("sizeFine", { h: hl }));
     var mk = D.market, mkey = L < mk.lo ? "marketShort" : L > mk.hi ? "marketLong" : "marketIn";
@@ -667,6 +669,16 @@
   /* ---------------- static + list building ---------------- */
   var checked = {};
   var picHidden = false;
+  // Below 1240px the preview and the to-scale picture share one spot and this picks which shows;
+  // on wide screens CSS shows both and ignores it.
+  var view = lsGet("catwand.view") === "scale" ? "scale" : "close";
+  function setView(v) {
+    view = v;
+    lsSet("catwand.view", v);
+    $("#views").setAttribute("data-view", v);
+    $("#vtClose").setAttribute("aria-pressed", v === "close" ? "true" : "false");
+    $("#vtScale").setAttribute("aria-pressed", v === "scale" ? "true" : "false");
+  }
   var thickSig = "", itemSig = "";
 
   function buildStatic() {
@@ -676,6 +688,8 @@
     setText("#langBtn", t("langBtn"));
     setText("#skip", t("skip"));
     setText("#tapHint", t("tapHint"));
+    setText("#vtClose", t("viewClose")); setText("#vtScale", t("viewScale"));
+    $("#viewTabs").setAttribute("aria-label", t("viewsLabel"));
     setText("#stageToggle", picHidden ? t("showPic") : t("hidePic"));
     setText("#gRodLabel", t("gRod"));
     setText("#gWristLabel", t("gWrist"));
@@ -683,7 +697,7 @@
     ["s1", "s2", "s3", "s4", "s5", "lenLabel", "matLabel", "thickLabel", "lineLenLabel", "hModeLabel", "hookLabel", "hookNote", "lineNote", "lineTypeLabel", "safetyTitle", "safeSrcL", "estTitle", "estNote", "estMoreS",
       "nameLabel", "myDesignsTitle", "shopeeIntro", "partsTitle", "suppliesTitle", "stepsTitle", "affiliateNote",
       "priceTitle", "priceNote", "foot", "sizeTitle", "sizeIntro", "personLabel", "catLabel", "hlLabel", "itemsTitle",
-      "whySummary", "why1", "why2", "why3", "why5", "whySources", "rodColorLabel", "rodColorNote", "handleColorLabel", "lineColorLabel", "marketHandle", "marketSrcL"].forEach(function (k) {
+      "whySummary", "why1", "why2", "why3", "why5", "whySources", "rodColorLabel", "rodColorNote", "handleColorLabel", "lineColorLabel", "marketHandle", "marketSrcL", "scaleTitle"].forEach(function (k) {
       var el = $("#" + k);
       if (el) el.textContent = t(k === "affiliateNote" ? "affiliate" : k);
     });
@@ -1076,6 +1090,9 @@
       buildStatic(); buildLists(); update(false);
     });
 
+    $("#vtClose").addEventListener("click", function () { setView("close"); });
+    $("#vtScale").addEventListener("click", function () { setView("scale"); });
+
     var panel = $("#panel");
     panel.addEventListener("change", function (e) {
       var el = e.target;
@@ -1086,7 +1103,7 @@
       if (el.getAttribute("data-chk")) { checked[el.getAttribute("data-chk")] = el.checked; return; }
       var lk = /^(ic|ip|if)-(\d+)$/.exec(el.name || "");   // colour, pattern or filling of one toy on the line
       if (lk && state.items[+lk[2]]) { state.items[+lk[2]][{ ic: "c", ip: "p", "if": "f" }[lk[1]]] = el.value; update(true); return; }
-      if (applyControl(el)) update(true);
+      if (applyControl(el)) { if (el.name === "cat" || el.id === "personRange") setView("scale"); update(true); }
     });
     panel.addEventListener("input", function (e) {
       var el = e.target;
@@ -1094,7 +1111,7 @@
         state.items[+el.getAttribute("data-pos")].at = clamp(Math.round(+el.value), 0, state.strLen);
         update(false); return;
       }
-      if (el.type === "range" && applyControl(el)) update(false);
+      if (el.type === "range" && applyControl(el)) { if (el.id === "personRange") setView("scale"); update(false); }
     });
 
     $("#toyGrid").addEventListener("click", function (e) {
@@ -1123,7 +1140,7 @@
       this.setAttribute("aria-expanded", picHidden ? "false" : "true");
       setText("#stageToggle", picHidden ? t("showPic") : t("hidePic"));
     });
-    $("#sizeFix").addEventListener("click", function () { state.length = sizeRange(state.person).mid; update(true); });
+    $("#sizeFix").addEventListener("click", function () { state.length = sizeRange(state.person).mid; setView("scale"); update(true); });
 
     // coming-soon shortcuts
     $("#soonSave").addEventListener("click", function () { $("#tab-save").click(); $("#designName").focus(); });
@@ -1188,7 +1205,7 @@
     function range(sel, r) { var el = $(sel); el.min = r.min; el.max = r.max; el.step = r.step; }
     range("#lenRange", D.length); range("#lineRange", D.line);
     range("#hlRange", D.handleLen); range("#personRange", D.person);
-    buildStatic(); buildLists(); bind(); update(true); loadPrices();
+    buildStatic(); buildLists(); bind(); setView(view); update(true); loadPrices();
   }
   init();
 })();

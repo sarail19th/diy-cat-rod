@@ -75,6 +75,10 @@ The cat safety list changes with the build: braided nylon, metal rings, clasps a
 
 Set the line length to 0 and the toys tie straight onto the rod tip, like some ready-made wands. The line type, line price and toy position sliders are hidden, and a short note and safety tip explain it.
 
+## Preview layout
+
+The wand preview and the to-scale picture (person, cat, rod) sit side by side on wide screens (1240px and up). On phones and narrower windows they share one sticky spot with a **Close-up | To scale** toggle, and moving the height slider or the cat size switches to the to-scale picture by itself. The choice is remembered in the browser. The height slider, cat size and the size verdict stay in the "Compare size" step.
+
 ## How the size guide works
 
 - The picture is drawn at 1 unit = 1 cm. The person is a simple figure scaled to the chosen height, the cat is a typical cat (about 40 cm chest to rump) scaled for kitten or large.
