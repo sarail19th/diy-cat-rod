@@ -22,7 +22,7 @@ window.CONFIG = {
   // Later, point this at your database (for example a Supabase REST view or an edge function)
   // that returns JSON like {"materials":{"bamboo":{"base":8,"perCm":0.5}},"handles":{"foam":{"price":15}},
   // "lines":{"cotton":{"perCm":0.12}},"hooks":{"ring":{"price":3}},"toys":{"fish":{"price":25}},
-  // "extras":{"glue":{"price":45}},"tipFit":{"price":4}}. Anything it omits keeps the sample price.
+  // "extras":{"glue":{"price":45}},"fills":{"nip":{"price":6}},"tipFit":{"price":4}}. Anything it omits keeps the sample price.
   PRICES_URL: "",
 
   ASSEMBLY_FEE: 59,    // THB, per wand we assemble
@@ -55,6 +55,10 @@ window.CATALOG = {
     { id: "adult", k: 1, body: 40, kg: "3.5–5", name: { th: "แมวโต", en: "Adult cat" } },
     { id: "large", k: 1.3, body: 52, kg: "6+", name: { th: "แมวตัวใหญ่", en: "Large cat" } }
   ],
+
+  // Ready-made wands on sale: rod or pole length in cm, from 12 retailer and review listings
+  // (Thai and international), checked Oct 2026. Handle lengths are rarely published.
+  market: { lo: 45, hi: 100, avg: 68, n: 12 },
 
   // Rods. sizes = outer diameters in mm you can buy. wall = tube wall in mm
   // (0 means solid). rho = density in g/cm3. E = stiffness in GPa.
@@ -117,22 +121,60 @@ window.CATALOG = {
   ],
 
   toys: [
-    { id: "fish", g: 7, price: 25, kw: "ตุ๊กตาปลาสักหลาด ของเล่นแมว",
+    { id: "fish", g: 7, price: 25, paint: true, doll: true, kw: "ตุ๊กตาปลาสักหลาด ของเล่นแมว",
       name: { th: "ปลาสักหลาด", en: "Felt fish" } },
-    { id: "mouse", g: 10, price: 35, kw: "หนูตุ๊กตา ของเล่นแมว",
+    { id: "mouse", g: 10, price: 35, paint: true, doll: true, kw: "หนูตุ๊กตา ของเล่นแมว",
       name: { th: "หนูตุ๊กตา", en: "Plush mouse" } },
-    { id: "feather", g: 2, price: 20, kw: "ขนนก ของเล่นแมว",
+    { id: "feather", g: 2, price: 20, paint: true, kw: "ขนนก ของเล่นแมว",
       name: { th: "ขนนก", en: "Feathers" } },
     { id: "bell", g: 3, price: 10, kw: "กระดิ่งเล็ก ของเล่นแมว",
       name: { th: "กระดิ่ง", en: "Bell" } },
-    { id: "ribbon", g: 1, price: 8, kw: "ริบบิ้นผ้า เส้นเล็ก",
+    { id: "ribbon", g: 1, price: 8, paint: true, kw: "ริบบิ้นผ้า เส้นเล็ก",
       name: { th: "ริบบิ้น", en: "Ribbon" } },
-    { id: "pompom", g: 2, price: 8, kw: "ปอมปอม DIY",
+    { id: "pompom", g: 2, price: 8, paint: true, kw: "ปอมปอม DIY",
       name: { th: "ปอมปอม", en: "Pompom" } },
-    { id: "nip", g: 6, price: 30, kw: "ถุงแคทนิป ของเล่นแมว",
+    { id: "nip", g: 6, price: 30, paint: true, kw: "ถุงแคทนิป ของเล่นแมว",
       name: { th: "ถุงแคทนิป", en: "Catnip pouch" } },
-    { id: "crinkle", g: 4, price: 15, kw: "ลูกบอลกรอบแกรบ แมว",
+    { id: "crinkle", g: 4, price: 15, paint: true, kw: "ลูกบอลกรอบแกรบ แมว",
       name: { th: "ลูกบอลกรอบแกรบ", en: "Crinkle ball" } }
+  ],
+
+  // Standard pastel colours for the rod, handle, line and toys. "paint: true" toys take a colour;
+  // "doll: true" toys (fish, mouse) also take a pattern and a filling. Leave the colour off to keep
+  // the material's own look.
+  colors: [
+    { id: "pink", hex: "#F7C6D4", kw: "ชมพู", name: { th: "ชมพู", en: "Pink" } },
+    { id: "peach", hex: "#FFD3B0", kw: "พีช", name: { th: "พีช", en: "Peach" } },
+    { id: "butter", hex: "#FFF0A6", kw: "เหลืองเนย", name: { th: "เหลืองเนย", en: "Butter yellow" } },
+    { id: "mint", hex: "#BDE8CE", kw: "มิ้นต์", name: { th: "มิ้นต์", en: "Mint" } },
+    { id: "sky", hex: "#BCDDF5", kw: "ฟ้า", name: { th: "ฟ้า", en: "Sky blue" } },
+    { id: "lavender", hex: "#D6C8F0", kw: "ลาเวนเดอร์", name: { th: "ลาเวนเดอร์", en: "Lavender" } },
+    { id: "cream", hex: "#FFF8EA", kw: "ครีม", name: { th: "ครีม", en: "Cream" } },
+    { id: "grey", hex: "#D5D8DF", kw: "เทา", name: { th: "เทา", en: "Grey" } }
+  ],
+
+  // Easy patterns for dolls. kw is added to the Shopee search.
+  patterns: [
+    { id: "solid", kw: "", name: { th: "สีเรียบ", en: "Plain" } },
+    { id: "stripes", kw: "ลายทาง", name: { th: "ลายทาง", en: "Stripes" } },
+    { id: "dots", kw: "ลายจุด", name: { th: "ลายจุด", en: "Polka dots" } },
+    { id: "checks", kw: "ลายตาราง", name: { th: "ลายตาราง", en: "Checks" } }
+  ],
+
+  // What is inside a doll. dg = extra grams, price = extra baht per doll, kw is added to the Shopee search.
+  fills: [
+    { id: "cotton", dg: 0, price: 0, kw: "",
+      name: { th: "ใยสังเคราะห์ธรรมดา", en: "Regular cotton" },
+      feel: { th: "นุ่ม เบา ถูกที่สุด", en: "Soft, light, cheapest" } },
+    { id: "nip", dg: 1, price: 6, kw: "แคทนิป",
+      name: { th: "แคทนิป", en: "Catnip" },
+      feel: { th: "ใส่แคทนิปแห้งแล้วเย็บปิด แมวหลายตัวชอบ แต่ไม่ใช่ทุกตัว", en: "Dried catnip sewn in. Many cats love it, not all" } },
+    { id: "zip", dg: 3, price: 14, kw: "แคทนิป ซิป",
+      name: { th: "แคทนิป + ซิป", en: "Catnip with zip" },
+      feel: { th: "มีช่องซิป เติมแคทนิปใหม่ได้เมื่อกลิ่นจาง", en: "Zip pocket, refill the catnip when the smell fades" } },
+    { id: "crinkle", dg: 0.5, price: 4, kw: "กรอบแกรบ",
+      name: { th: "กรอบแกรบ", en: "Crinkle paper" },
+      feel: { th: "มีเสียงกรอบแกรบเมื่อแมวจับ", en: "Rustles when the cat grabs it" } }
   ],
 
   // How toys attach to the line. g = grams per piece (one per toy). Used on the

@@ -60,6 +60,17 @@ Each part shows a greyed, read-only price box, and a cost estimate (DIY, without
 
 The cat safety list changes with the build: braided nylon, metal rings, clasps and swivels, wire and plastic-tube rods, and small toy parts each raise a warning, and soft cotton cord is recommended. Source on string and thread swallowing: VCA Animal Hospitals, "Linear Foreign Body in Cats".
 
+## Colours, patterns and fillings
+
+- **Colour.** The rod, handle and line each have a row of 8 standard pastel colours (pink, peach, butter yellow, mint, sky blue, lavender, cream, grey) plus the material's own colour. Every toy except the bell has its own colour row too. The rod and handle are meant to be painted with pet-safe water-based paint or wrapped in washi tape; the safety list says so.
+- **Dolls (fish and mouse)** also get an easy pattern (plain, stripes, polka dots, checks) and a filling: regular cotton, catnip, catnip with a zip pocket (so you can refill it), or crinkle paper. Each filling adds a little weight and price, and the zip raises a small-parts warning.
+- The choices show in the drawing, the weight check, the price estimate, the Shopee list (colour, pattern and filling are added to the search words) and the order text. They are saved in the share link. Old links without colours still open.
+- Colours, patterns and fillings live in `CATALOG.colors`, `CATALOG.patterns` and `CATALOG.fills` in `data.js`. Add `paint: true` or `doll: true` to a toy there to give it these options. A `fills` price can come from `PRICES_URL` like the other prices.
+
+## Market comparison
+
+`CATALOG.market` holds the rod or pole length of 12 ready-made wands from retailer and review listings (checked October 2026): 45 to 100 cm, about 68 cm on average and median. The size guide shows where your rod falls. The default 60 cm and the suggested range sit near the middle of the market. Shops rarely publish handle length or thickness. The only handle figure found was about 16 cm for one wooden-handled wand (a single listing), and cheap wands are often a thin bare stick, so the grip checks here (25 to 35 mm thick, 12 cm or longer) are stricter than most wands on sale.
+
 ## No-line wands
 
 Set the line length to 0 and the toys tie straight onto the rod tip, like some ready-made wands. The line type, line price and toy position sliders are hidden, and a short note and safety tip explain it.

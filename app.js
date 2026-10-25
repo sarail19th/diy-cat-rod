@@ -31,15 +31,21 @@
       handle: "foam", hMode: "cover", handleLen: D.handleLen.def,
       strLen: D.line.def, strType: "cotton", hook: "ring",
       person: D.person.def, cat: "adult",
-      items: [{ id: "fish", at: D.line.def }, { id: "ribbon", at: 22 }]
+      rodColor: "", handleColor: "", lineColor: "",
+      items: [newItem("fish", D.line.def), newItem("ribbon", 22)]
     };
   }
 
   function serialize(s) {
-    var items = s.items.map(function (it) { return it.id + "." + it.at; }).join(",");
+    // colour, pattern and filling are written only when they differ from the plain toy, so older links stay short
+    var items = s.items.map(function (it) {
+      var toy = find(D.toys, it.id), c = toy.paint ? it.c : "", p = toy.doll ? it.p : "solid", f = toy.doll ? it.f : "cotton";
+      return it.id + "." + it.at + (c || p !== "solid" || f !== "cotton" ? "." + c + "." + p + "." + f : "");
+    }).join(",");
     return new URLSearchParams({
       l: s.length, m: s.material, d: s.rodD, h: s.handle, hm: s.hMode, hl: s.handleLen,
-      sl: s.strLen, st: s.strType, hk: s.hook, ph: s.person, cs: s.cat, i: items
+      sl: s.strLen, st: s.strType, hk: s.hook, ph: s.person, cs: s.cat,
+      rc: s.rodColor, hc: s.handleColor, lc: s.lineColor, i: items
     }).toString();
   }
 
@@ -60,17 +66,24 @@
     if (find(D.hooks, q.get("hk"))) s.hook = q.get("hk");
     s.person = snap(parseFloat(q.get("ph")) || D.person.def, D.person);
     if (find(D.cats, q.get("cs"))) s.cat = q.get("cs");
+    if (find(D.colors, q.get("rc"))) s.rodColor = q.get("rc");
+    if (find(D.colors, q.get("hc"))) s.handleColor = q.get("hc");
+    if (find(D.colors, q.get("lc"))) s.lineColor = q.get("lc");
     s.items = [];
     var left = C.MAX_ATTACH;
     (q.get("i") || "").split(",").forEach(function (tok) {
-      var id, at, n = 1, p;
+      var id, at, n = 1, p, look = [];
       if (!tok || left <= 0) return;
-      if (tok.indexOf(".") > 0) { p = tok.split("."); id = p[0]; at = parseFloat(p[1]); }
+      if (tok.indexOf(".") > 0) { p = tok.split("."); id = p[0]; at = parseFloat(p[1]); look = p.slice(2); }
       else if (tok.indexOf(":") > 0) { p = tok.split(":"); id = p[0]; n = Math.floor(parseFloat(p[1])); at = s.strLen; } // older links
       else return;
       if (!find(D.toys, id)) return;
       for (var k = 0; k < n && left > 0; k++) {
-        s.items.push({ id: id, at: clamp(Math.round(isNaN(at) ? s.strLen : at), 0, s.strLen) });
+        var it = newItem(id, clamp(Math.round(isNaN(at) ? s.strLen : at), 0, s.strLen));
+        if (find(D.colors, look[0])) it.c = look[0];
+        if (find(D.patterns, look[1])) it.p = look[1];
+        if (find(D.fills, look[2])) it.f = look[2];
+        s.items.push(it);
         left--;
       }
     });
@@ -102,7 +115,7 @@
   function loadPrices() {
     if (!C.PRICES_URL || !window.fetch) return;
     fetch(C.PRICES_URL).then(function (r) { return r.json(); }).then(function (j) {
-      ["materials", "handles", "lines", "hooks", "toys", "extras"].forEach(function (g) {
+      ["materials", "handles", "lines", "hooks", "toys", "extras", "fills"].forEach(function (g) {
         var src = j[g] || {};
         D[g].forEach(function (it) { if (src[it.id]) for (var k in src[it.id]) it[k] = src[it.id][k]; });
       });
@@ -114,8 +127,11 @@
 
   /* ---------------- cat safety ---------------- */
   function safetyItems(c) {
-    var warn = [], tip = [], small = false;
-    state.items.forEach(function (it) { if (it.id === "bell" || it.id === "pompom" || it.id === "feather") small = true; });
+    var warn = [], tip = [], small = false, doll = false, zip = false, nip = false;
+    state.items.forEach(function (it) {
+      if (it.id === "bell" || it.id === "pompom" || it.id === "feather") small = true;
+      if (find(D.toys, it.id).doll) { doll = true; if (it.f === "zip") zip = true; if (it.f === "nip" || it.f === "zip") nip = true; }
+    });
     function add(list, key) { list.push({ title: t(key + "_t"), text: t(key) }); }
     if (state.strLen === 0) add(tip, "s_noline");
     else if (state.strType === "braid") add(warn, "s_braid"); else add(tip, "s_cotton");
@@ -124,6 +140,10 @@
     if (state.material === "tube") add(warn, "s_tube");
     if (state.material === "bamboo" || state.material === "wood") add(tip, "s_wood");
     if (small) add(warn, "s_small");
+    if (zip) add(warn, "s_zip");
+    if (nip) add(tip, "s_nip");
+    if (doll) add(tip, "s_seam");
+    if (state.rodColor || state.handleColor) add(tip, "s_paint");
     add(tip, "s_always");
     return { warn: warn, tip: tip };
   }
@@ -150,7 +170,7 @@
     var rod = s.length * sp.gpc, hand = h.bare ? 0 : h.gpc * s.handleLen;
     var free = joined ? s.length : Math.max(s.length - s.handleLen, 10);   // rod in front of the grip
     var str = s.strLen * ln.gpcm, toys = 0;
-    s.items.forEach(function (it) { toys += find(D.toys, it.id).g; });
+    s.items.forEach(function (it) { toys += toyG(it); });
     var hookG = hk.g ? hk.g * s.items.length + D.tipFit.g : 0;
     var tip = str + toys + hookG, total = rod + hand + tip;
     var limit = flexLimit(sp.EI, free);
@@ -206,14 +226,13 @@
   }
 
   function prices(s) {
-    var c = calc(s), rows = [], counts = {};
+    var c = calc(s), rows = [];
     rows.push({ label: t("rodLine", { mat: nm(c.m), len: s.length }), v: Math.round(c.m.base + c.m.perCm * s.length) });
     if (!c.h.bare) rows.push({ label: t("handleLine", { handle: nm(c.h) }), v: c.h.price });
     if (s.strLen > 0) rows.push({ label: t("lineLine", { line: nm(c.ln), len: s.strLen }), v: Math.round(c.ln.perCm * s.strLen) });
-    s.items.forEach(function (it) { counts[it.id] = (counts[it.id] || 0) + 1; });
-    D.toys.forEach(function (toy) {
-      var q = counts[toy.id] || 0;
-      if (q) rows.push({ label: nm(toy) + " × " + q, v: toy.price * q });
+    groupItems(s.items).forEach(function (g) {
+      var look = lookParts(g.it).join(", ");
+      rows.push({ label: nm(find(D.toys, g.it.id)) + (look ? " (" + look + ")" : "") + " × " + g.q, v: toyPrice(g.it) * g.q });
     });
     if (c.hk.g) {
       rows.push({ label: nm(c.hk) + " × " + s.items.length, v: c.hk.price * s.items.length });
@@ -232,26 +251,145 @@
     return counts;
   }
 
+  /* ---------------- colours ---------------- */
+  function hexRgb(h) { return [1, 3, 5].map(function (i) { return parseInt(h.substr(i, 2), 16); }); }
+  function rgbHex(a) { return "#" + a.map(function (v) { return ("0" + clamp(Math.round(v), 0, 255).toString(16)).slice(-2); }).join(""); }
+  function shade(h, f) { return rgbHex(hexRgb(h).map(function (v) { return v * f; })); }
+  function mix(a, b, k) { var x = hexRgb(a), y = hexRgb(b); return rgbHex(x.map(function (v, i) { return v + (y[i] - v) * k; })); }
+  function colorHex(id) { var o = id ? find(D.colors, id) : null; return o ? o.hex : null; }
+  function colorName(id, th) { var o = id ? find(D.colors, id) : null; return o ? o.name[th ? "th" : lang] : ""; }
+  // Colour in use, or the part's own colour when the visitor has not picked one.
+  function rodCol(c) { return colorHex(state.rodColor) || c.m.color; }
+  function handleCol(c) { return c.h.bare ? rodCol(c) : (colorHex(state.handleColor) || c.h.color); }
+  function lineCol(c) { return colorHex(state.lineColor) || c.ln.color; }
+  // Copy of a part with its colour swapped, for the little part icons.
+  function tinted(o, id) {
+    var hex = colorHex(id), r = {}, k;
+    if (!hex) return o;
+    for (k in o) r[k] = o[k];
+    r.color = hex;
+    return r;
+  }
+
+  /* ---------------- toys: look, weight, price ---------------- */
+  // c = colour id ("" keeps the toy as drawn), p = pattern and f = filling (dolls only).
+  function newItem(id, at) { return { id: id, at: at, c: "", p: "solid", f: "cotton" }; }
+  function toyG(it) { var toy = find(D.toys, it.id); return toy.g + (toy.doll ? find(D.fills, it.f).dg : 0); }
+  function toyPrice(it) { var toy = find(D.toys, it.id); return toy.price + (toy.doll ? find(D.fills, it.f).price : 0); }
+
+  // Parts of the look that differ from the plain default, e.g. ["Pink", "Polka dots", "Catnip"].
+  function lookParts(it, th) {
+    var toy = find(D.toys, it.id), out = [], k = th ? "th" : lang, col = toy.paint ? find(D.colors, it.c) : null, pt, fl;
+    if (col) out.push(col.name[k]);
+    if (toy.doll) {
+      pt = find(D.patterns, it.p); fl = find(D.fills, it.f);
+      if (pt && pt.id !== "solid") out.push(pt.name[k]);
+      if (fl && fl.id !== "cotton") out.push(fl.name[k]);
+    }
+    return out;
+  }
+  function toyKw(it) {
+    var toy = find(D.toys, it.id), kw = toy.kw, col = toy.paint ? find(D.colors, it.c) : null, pt, fl;
+    if (col) kw += " สี" + col.kw;
+    if (toy.doll) {
+      pt = find(D.patterns, it.p); fl = find(D.fills, it.f);
+      if (pt && pt.kw) kw += " " + pt.kw;
+      if (fl && fl.kw) kw += " " + fl.kw;
+    }
+    return kw;
+  }
+  // Toys that look the same are listed once with a count.
+  function groupItems(items) {
+    var keys = [], map = {};
+    items.forEach(function (it) {
+      var toy = find(D.toys, it.id), k = [it.id, toy.paint ? it.c : "", toy.doll ? it.p : "", toy.doll ? it.f : ""].join("|");
+      if (!map[k]) { map[k] = { key: k, it: it, q: 0 }; keys.push(k); }
+      map[k].q++;
+    });
+    return keys.map(function (k) { return map[k]; });
+  }
+
   /* ---------------- toy drawings (top of each toy at 0,0, hangs down) ---------------- */
-  function pompomSvg() {
-    var o = '<circle cx="0" cy="13" r="11" fill="#E8547A"/>';
+  var pid = 0;
+  // Pattern laid over a doll body. shape is the body outline and x0..y1 its box; clipped so nothing spills out.
+  // Ids are numbered so several dolls on the page never share a clip.
+  function patternSvg(p, shape, x0, y0, x1, y1, base) {
+    var id, o, x, y, i = 0;
+    if (!p || p === "solid") return "";
+    id = "pt" + (++pid);
+    o = '<clipPath id="' + id + '">' + shape + '</clipPath><g clip-path="url(#' + id + ')">';
+    if (p === "stripes") {
+      for (x = x0; x < x1; x += 8) o += '<rect x="' + x + '" y="' + y0 + '" width="4" height="' + (y1 - y0) + '" fill="' + shade(base, 0.8) + '" opacity=".75"/>';
+    } else if (p === "dots") {
+      for (y = y0 + 3; y < y1; y += 7, i++) for (x = x0 + 3 + (i % 2) * 3.5; x < x1; x += 7) o += '<circle cx="' + x + '" cy="' + y + '" r="1.7" fill="#fff" opacity=".9"/>';
+    } else {
+      for (y = y0; y < y1; y += 6, i++) for (x = x0 + (i % 2) * 6; x < x1; x += 12) o += '<rect x="' + x + '" y="' + y + '" width="6" height="6" fill="' + shade(base, 0.82) + '" opacity=".7"/>';
+    }
+    return o + "</g>";
+  }
+
+  // A small mark on the doll that shows what is inside.
+  function fillMark(f, x, y) {
+    var at = ' transform="translate(' + x + "," + y + ')"';
+    if (f === "nip") return "<path" + at + ' d="M0 0 q4 -6 9 -1 q-4 6 -9 1z" fill="#6FBF73" stroke="#3E8A43" stroke-width=".8"/>';
+    if (f === "zip") return "<g" + at + '><line x1="0" y1="0" x2="13" y2="0" stroke="#8D95A8" stroke-width="2.4" stroke-dasharray="1.6 1.2"/><rect x="11" y="-2.6" width="4" height="5.2" rx="1.2" fill="#C9CED8" stroke="#8D95A8" stroke-width=".8"/></g>';
+    if (f === "crinkle") return "<path" + at + ' d="M0 0 l2.5 -4 l2.5 4 l2.5 -4 l2.5 4" fill="none" stroke="#fff" stroke-width="1.3" stroke-linejoin="round"/>';
+    return "";
+  }
+
+  function pompomSvg(c) {
+    var base = c || "#E8547A", fluff = c ? shade(c, 0.85) : "#F2879F", o = '<circle cx="0" cy="13" r="11" fill="' + base + '"/>';
     for (var i = 0; i < 14; i++) {
-      var a = i * Math.PI * 2 / 14, c = Math.cos(a), s = Math.sin(a);
-      o += '<line x1="' + (c * 8).toFixed(1) + '" y1="' + (13 + s * 8).toFixed(1) + '" x2="' + (c * 13.5).toFixed(1) + '" y2="' + (13 + s * 13.5).toFixed(1) + '" stroke="#F2879F" stroke-width="2" stroke-linecap="round"/>';
+      var a = i * Math.PI * 2 / 14, cs = Math.cos(a), sn = Math.sin(a);
+      o += '<line x1="' + (cs * 8).toFixed(1) + '" y1="' + (13 + sn * 8).toFixed(1) + '" x2="' + (cs * 13.5).toFixed(1) + '" y2="' + (13 + sn * 13.5).toFixed(1) + '" stroke="' + fluff + '" stroke-width="2" stroke-linecap="round"/>';
     }
     return o + '<circle cx="-3" cy="9" r="3" fill="#fff" opacity=".35"/>';
   }
 
+  function fishSvg(c, p, f) {
+    var base = c || "#F4B63F", edge = c ? shade(c, 0.68) : "#B5822A", body = "M-16 0 C-8 -12 8 -12 14 0 C8 12 -8 12 -16 0Z";
+    return '<g transform="translate(0,17) rotate(90)"><path d="M12 0 L25 -10 L25 10Z" fill="' + (c ? shade(c, 0.92) : base) + '" stroke="' + edge + '" stroke-width="1"/>' +
+      '<path d="' + body + '" fill="' + base + '" stroke="' + edge + '" stroke-width="1"/>' +
+      patternSvg(p, '<path d="' + body + '"/>', -16, -10, 14, 10, base) + fillMark(f, -9, 4) +
+      '<circle cx="-8" cy="-3" r="1.9" fill="#3A2E20"/><path d="M-1 -8 Q3 0 -1 8" fill="none" stroke="#3A2E20" stroke-width="1.2" stroke-dasharray="2 2"/></g>';
+  }
+
+  function mouseSvg(c, p, f) {
+    var base = c || "#C9CED8", edge = c ? shade(c, 0.68) : "#8D95A8", ear = c ? mix(c, "#F2A6B8", 0.5) : "#F2A6B8", tail = c ? shade(c, 0.75) : "#E58FA3";
+    return '<g transform="translate(0,15) rotate(90)"><path d="M14 0 Q27 -9 33 4" fill="none" stroke="' + tail + '" stroke-width="2.2" stroke-linecap="round"/>' +
+      '<ellipse rx="15" ry="9.5" fill="' + base + '" stroke="' + edge + '" stroke-width="1"/>' +
+      patternSvg(p, '<ellipse rx="15" ry="9.5"/>', -15, -9.5, 15, 9.5, base) + fillMark(f, -3, 4) +
+      '<circle cx="-5" cy="-9" r="5" fill="' + ear + '" stroke="' + edge + '" stroke-width="1"/><circle cx="-5" cy="9" r="5" fill="' + ear + '" stroke="' + edge + '" stroke-width="1"/>' +
+      '<circle cx="-10" cy="-3" r="1.6" fill="#3A2E20"/><circle cx="-15" cy="0" r="2" fill="#E8547A"/></g>';
+  }
+
   var TOY = {
-    fish: '<g transform="translate(0,17) rotate(90)"><path d="M12 0 L25 -10 L25 10Z" fill="#F4B63F" stroke="#B5822A" stroke-width="1"/><path d="M-16 0 C-8 -12 8 -12 14 0 C8 12 -8 12 -16 0Z" fill="#F4B63F" stroke="#B5822A" stroke-width="1"/><circle cx="-8" cy="-3" r="1.9" fill="#3A2E20"/><path d="M-1 -8 Q3 0 -1 8" fill="none" stroke="#3A2E20" stroke-width="1.2" stroke-dasharray="2 2"/></g>',
-    mouse: '<g transform="translate(0,15) rotate(90)"><path d="M14 0 Q27 -9 33 4" fill="none" stroke="#E58FA3" stroke-width="2.2" stroke-linecap="round"/><ellipse rx="15" ry="9.5" fill="#C9CED8" stroke="#8D95A8" stroke-width="1"/><circle cx="-5" cy="-9" r="5" fill="#F2A6B8" stroke="#8D95A8" stroke-width="1"/><circle cx="-5" cy="9" r="5" fill="#F2A6B8" stroke="#8D95A8" stroke-width="1"/><circle cx="-10" cy="-3" r="1.6" fill="#3A2E20"/><circle cx="-15" cy="0" r="2" fill="#E8547A"/></g>',
-    feather: '<g transform="translate(0,2)"><path transform="rotate(-20)" d="M0 0 C-8 10 -7 26 0 36 C7 26 8 10 0 0Z" fill="#F6F7FB"/><path transform="rotate(20)" d="M0 0 C-8 10 -7 26 0 36 C7 26 8 10 0 0Z" fill="#F4B63F"/><path d="M0 0 C-8 10 -7 26 0 38 C7 26 8 10 0 0Z" fill="#E8547A"/><path d="M0 2 L0 36" stroke="#8E2442" stroke-width="1"/></g>',
-    bell: '<circle cx="0" cy="1.5" r="1.8" fill="none" stroke="#9A6E12" stroke-width="1.2"/><circle cx="0" cy="11" r="8" fill="#E3A92B" stroke="#9A6E12" stroke-width="1"/><path d="M-8 12 H8" stroke="#9A6E12" stroke-width="1.4"/><circle cx="0" cy="14.5" r="1.5" fill="#9A6E12"/><ellipse cx="-3" cy="7" rx="2" ry="3" fill="#fff" opacity=".5"/>',
-    ribbon: '<circle cx="0" cy="2" r="2.4" fill="#F4B63F"/><path d="M-1 3 C-10 12 6 20 -3 30 C-7 36 -1 40 -3 46" fill="none" stroke="#E8547A" stroke-width="5" stroke-linecap="round"/><path d="M2 3 C8 10 -2 18 6 27 C9 32 5 36 7 40" fill="none" stroke="#F4B63F" stroke-width="4" stroke-linecap="round"/>',
-    pompom: pompomSvg(),
-    nip: '<path d="M-6 3 Q-12 12 -11 20 Q-10 28 0 28 Q10 28 11 20 Q12 12 6 3Z" fill="#6FBF73" stroke="#3E8A43" stroke-width="1"/><path d="M-7 5 H7" stroke="#F4B63F" stroke-width="2"/><path d="M-6 17 q6 -6 12 0 q-6 6 -12 0z" fill="#3E8A43" opacity=".55"/>',
-    crinkle: '<circle cx="0" cy="11" r="10" fill="#D6DCE5" stroke="#98A2B8" stroke-width="1"/><path d="M-7 6 L1 10 L-5 16 M3 4 L6 12 L1 17" fill="none" stroke="#98A2B8" stroke-width="1.2"/><ellipse cx="-3.5" cy="6" rx="3" ry="2" fill="#fff" opacity=".7"/>'
+    fish: fishSvg,
+    mouse: mouseSvg,
+    feather: function (c) {
+      var left = c ? mix(c, "#fff", 0.6) : "#F6F7FB", right = c ? shade(c, 0.88) : "#F4B63F", mid = c || "#E8547A", stem = c ? shade(c, 0.55) : "#8E2442";
+      return '<g transform="translate(0,2)"><path transform="rotate(-20)" d="M0 0 C-8 10 -7 26 0 36 C7 26 8 10 0 0Z" fill="' + left + '"/><path transform="rotate(20)" d="M0 0 C-8 10 -7 26 0 36 C7 26 8 10 0 0Z" fill="' + right + '"/><path d="M0 0 C-8 10 -7 26 0 38 C7 26 8 10 0 0Z" fill="' + mid + '"/><path d="M0 2 L0 36" stroke="' + stem + '" stroke-width="1"/></g>';
+    },
+    bell: function () {
+      return '<circle cx="0" cy="1.5" r="1.8" fill="none" stroke="#9A6E12" stroke-width="1.2"/><circle cx="0" cy="11" r="8" fill="#E3A92B" stroke="#9A6E12" stroke-width="1"/><path d="M-8 12 H8" stroke="#9A6E12" stroke-width="1.4"/><circle cx="0" cy="14.5" r="1.5" fill="#9A6E12"/><ellipse cx="-3" cy="7" rx="2" ry="3" fill="#fff" opacity=".5"/>';
+    },
+    ribbon: function (c) {
+      return '<circle cx="0" cy="2" r="2.4" fill="' + (c ? shade(c, 0.7) : "#F4B63F") + '"/><path d="M-1 3 C-10 12 6 20 -3 30 C-7 36 -1 40 -3 46" fill="none" stroke="' + (c || "#E8547A") + '" stroke-width="5" stroke-linecap="round"/><path d="M2 3 C8 10 -2 18 6 27 C9 32 5 36 7 40" fill="none" stroke="' + (c ? shade(c, 0.82) : "#F4B63F") + '" stroke-width="4" stroke-linecap="round"/>';
+    },
+    pompom: pompomSvg,
+    nip: function (c) {
+      return '<path d="M-6 3 Q-12 12 -11 20 Q-10 28 0 28 Q10 28 11 20 Q12 12 6 3Z" fill="' + (c || "#6FBF73") + '" stroke="' + (c ? shade(c, 0.65) : "#3E8A43") + '" stroke-width="1"/><path d="M-7 5 H7" stroke="#F4B63F" stroke-width="2"/><path d="M-6 17 q6 -6 12 0 q-6 6 -12 0z" fill="#3E8A43" opacity=".55"/>';
+    },
+    crinkle: function (c) {
+      var edge = c ? shade(c, 0.7) : "#98A2B8";
+      return '<circle cx="0" cy="11" r="10" fill="' + (c || "#D6DCE5") + '" stroke="' + edge + '" stroke-width="1"/><path d="M-7 6 L1 10 L-5 16 M3 4 L6 12 L1 17" fill="none" stroke="' + edge + '" stroke-width="1.2"/><ellipse cx="-3.5" cy="6" rx="3" ry="2" fill="#fff" opacity=".7"/>';
+    }
   };
+  // Inside of a toy's svg for one toy on the line (or a plain toy when given a bare newItem).
+  function toyInner(it) {
+    var toy = find(D.toys, it.id);
+    return TOY[it.id](toy.paint ? colorHex(it.c) : null, toy.doll ? it.p : "solid", toy.doll ? it.f : "cotton");
+  }
 
   // Where toys hang. Toys at the same spot on the line fan out sideways; toys partway
   // along the line hang a little to the side so the line stays visible.
@@ -265,7 +403,7 @@
       if (near === 0) dx = o.it.at < strLen ? baseOff : 0;
       else dx = (near % 2 ? -1 : 1) * Math.ceil(near / 2) * spacing;
       placed.push(o.it.at);
-      out.push({ id: o.it.id, at: o.it.at, dx: dx });
+      out.push({ id: o.it.id, at: o.it.at, dx: dx, it: o.it });
     });
     return out;
   }
@@ -308,7 +446,7 @@
   };
   function iconSvg(kind, o, arg) {
     if (o && o.img) return '<img class="pico" src="' + esc(o.img) + '" alt="">';
-    var inner = kind === "toy" ? TOY[arg] : ICON[kind](arg);
+    var inner = kind === "toy" ? toyInner(arg) : ICON[kind](arg);
     return '<svg class="pico" viewBox="-26 -2 52 54" aria-hidden="true">' + inner + "</svg>";
   }
 
@@ -383,7 +521,7 @@
     svg += '<text x="' + mx.toFixed(1) + '" y="' + my.toFixed(1) + '" text-anchor="middle" transform="rotate(-26 ' + mx.toFixed(1) + " " + my.toFixed(1) + ')" fill="#fff" font-size="16" font-weight="600" style="font-family:var(--font-body)">' + esc(t("ruleRod", { len: L })) + "</text>";
 
     // rod
-    svg += '<path d="' + rodD + '" fill="' + c.m.color + '" stroke="rgba(255,255,255,.55)" stroke-width="1.2" stroke-linejoin="round"/>';
+    svg += '<path d="' + rodD + '" fill="' + rodCol(c) + '" stroke="rgba(255,255,255,.55)" stroke-width="1.2" stroke-linejoin="round"/>';
     if (c.m.node) {
       [0.25, 0.52, 0.78].forEach(function (s) {
         var p = pts[Math.round(N * s)], hw = (4.6 - 2.4 * s) * 1.4, nx = -Math.sin(p.a), ny = Math.cos(p.a);
@@ -400,7 +538,7 @@
     // handle (length follows the slider, up to what fits on screen)
     var HPX = c.joined ? clamp(100 * state.handleLen / 14, 56, 112) : clamp(rodPx * state.handleLen / L, 30, 140);
     var hshift = c.joined ? 0 : HPX - 8;   // a sleeve sits on the rod; a joined handle sits behind it
-    var hw2 = c.h.bare ? 9 : clamp(8 + c.gripD * 0.55, 11, 26), hcol = c.h.bare ? c.m.color : c.h.color;
+    var hw2 = c.h.bare ? 9 : clamp(8 + c.gripD * 0.55, 11, 26), hcol = handleCol(c);
     svg += '<g transform="translate(' + X0 + "," + Y0 + ') rotate(-26)"><g transform="translate(' + hshift + ',0)">' +
       '<clipPath id="hclip"><rect x="' + -HPX + '" y="' + -hw2 / 2 + '" width="' + (HPX + 8) + '" height="' + hw2 + '" rx="' + hw2 / 2 + '"/></clipPath>' +
       '<rect x="' + -HPX + '" y="' + -hw2 / 2 + '" width="' + (HPX + 8) + '" height="' + hw2 + '" rx="' + hw2 / 2 + '" fill="' + hcol + '"/>' +
@@ -414,14 +552,14 @@
     var tip = pts[N], spx = state.strLen * 1.6;
     var laid = layoutItems(state.items, 34, 16, state.strLen), maxDx = 0;
     svg += '<g transform="translate(' + tip.x.toFixed(1) + "," + tip.y.toFixed(1) + ')"><g class="swing' + (doSwing ? " go" : "") + '" id="swing">' +
-      '<line x1="0" y1="0" x2="0" y2="' + spx.toFixed(1) + '" stroke="' + c.ln.color + '" stroke-width="2.2" stroke-linecap="round"/>' +
-      '<circle cx="0" cy="' + spx.toFixed(1) + '" r="3.2" fill="' + c.ln.color + '"/>';
+      '<line x1="0" y1="0" x2="0" y2="' + spx.toFixed(1) + '" stroke="' + lineCol(c) + '" stroke-width="2.2" stroke-linecap="round"/>' +
+      '<circle cx="0" cy="' + spx.toFixed(1) + '" r="3.2" fill="' + lineCol(c) + '"/>';
     laid.forEach(function (o) {
       var py = o.at * 1.6, hy = py + 12;
       maxDx = Math.max(maxDx, Math.abs(o.dx));
-      svg += (c.hk.g ? hookMark(c.hk.id, 0, py.toFixed(1), 1.1) : '<circle cx="0" cy="' + py.toFixed(1) + '" r="2.8" fill="' + c.ln.color + '"/>') +
-        '<line x1="0" y1="' + py.toFixed(1) + '" x2="' + o.dx + '" y2="' + hy.toFixed(1) + '" stroke="' + c.ln.color + '" stroke-width="1.6"/>' +
-        '<g transform="translate(' + o.dx + "," + hy.toFixed(1) + ')">' + TOY[o.id] + "</g>";
+      svg += (c.hk.g ? hookMark(c.hk.id, 0, py.toFixed(1), 1.1) : '<circle cx="0" cy="' + py.toFixed(1) + '" r="2.8" fill="' + lineCol(c) + '"/>') +
+        '<line x1="0" y1="' + py.toFixed(1) + '" x2="' + o.dx + '" y2="' + hy.toFixed(1) + '" stroke="' + lineCol(c) + '" stroke-width="1.6"/>' +
+        '<g transform="translate(' + o.dx + "," + hy.toFixed(1) + ')">' + toyInner(o.it) + "</g>";
     });
     svg += "</g></g>";
     if (c.hk.g) svg += '<circle cx="' + tip.x.toFixed(1) + '" cy="' + tip.y.toFixed(1) + '" r="4" fill="none" stroke="' + METAL + '" stroke-width="1.8"/>';
@@ -476,11 +614,11 @@
     var a = -22 * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a);
     var bx = hx - hl * ca, by = hy - hl * sa, fx = hx + 3 * ca, fy = hy + 3 * sa;
     var tx = hx + (c.joined ? L : L - hl) * ca, ty = hy + (c.joined ? L : L - hl) * sa;
-    var hw = Math.max(1.6, c.gripD / 10), hcol = c.h.bare ? c.m.color : c.h.color;
+    var hw = Math.max(1.6, c.gripD / 10), hcol = handleCol(c);
     s += '<line x1="' + bx.toFixed(1) + '" y1="' + by.toFixed(1) + '" x2="' + fx.toFixed(1) + '" y2="' + fy.toFixed(1) + '" stroke="rgba(58,46,32,.55)" stroke-width="' + (hw + 1.2).toFixed(1) + '" stroke-linecap="round"/>' +
       '<line x1="' + bx.toFixed(1) + '" y1="' + by.toFixed(1) + '" x2="' + fx.toFixed(1) + '" y2="' + fy.toFixed(1) + '" stroke="' + hcol + '" stroke-width="' + hw.toFixed(1) + '" stroke-linecap="round"/>' +
       '<line x1="' + fx.toFixed(1) + '" y1="' + fy.toFixed(1) + '" x2="' + tx.toFixed(1) + '" y2="' + ty.toFixed(1) + '" stroke="rgba(58,46,32,.55)" stroke-width="3" stroke-linecap="round"/>' +
-      '<line x1="' + fx.toFixed(1) + '" y1="' + fy.toFixed(1) + '" x2="' + tx.toFixed(1) + '" y2="' + ty.toFixed(1) + '" stroke="' + c.m.color + '" stroke-width="2" stroke-linecap="round"/>';
+      '<line x1="' + fx.toFixed(1) + '" y1="' + fy.toFixed(1) + '" x2="' + tx.toFixed(1) + '" y2="' + ty.toFixed(1) + '" stroke="' + rodCol(c) + '" stroke-width="2" stroke-linecap="round"/>';
 
     // length ruler above the rod
     var nx = sa, ny = -ca, off = 10;
@@ -499,7 +637,7 @@
       var py = ty + o.at, hy2 = py + 3;
       s += '<circle cx="' + tx.toFixed(1) + '" cy="' + py.toFixed(1) + '" r=".9" fill="' + soft + '"/>' +
         '<line x1="' + tx.toFixed(1) + '" y1="' + py.toFixed(1) + '" x2="' + (tx + o.dx).toFixed(1) + '" y2="' + hy2.toFixed(1) + '" stroke="' + soft + '" stroke-width=".6"/>' +
-        '<g transform="translate(' + (tx + o.dx).toFixed(1) + "," + hy2.toFixed(1) + ') scale(.2)">' + TOY[o.id] + "</g>";
+        '<g transform="translate(' + (tx + o.dx).toFixed(1) + "," + hy2.toFixed(1) + ') scale(.2)">' + toyInner(o.it) + "</g>";
     });
 
     // cat under the toy, facing the person
@@ -522,6 +660,8 @@
     $("#sizeFix").hidden = key === "sizeFit";
     setText("#sizeFix", t("sizeFix", { mid: r.mid }));
     setText("#sizeFine", t("sizeFine", { h: hl }));
+    var mk = D.market, mkey = L < mk.lo ? "marketShort" : L > mk.hi ? "marketLong" : "marketIn";
+    setText("#marketNote", t(mkey, { lo: mk.lo, hi: mk.hi, avg: mk.avg, n: mk.n, len: L }));
   }
 
   /* ---------------- static + list building ---------------- */
@@ -543,7 +683,7 @@
     ["s1", "s2", "s3", "s4", "s5", "lenLabel", "matLabel", "thickLabel", "lineLenLabel", "hModeLabel", "hookLabel", "hookNote", "lineNote", "lineTypeLabel", "safetyTitle", "safeSrcL", "estTitle", "estNote", "estMoreS",
       "nameLabel", "myDesignsTitle", "shopeeIntro", "partsTitle", "suppliesTitle", "stepsTitle", "affiliateNote",
       "priceTitle", "priceNote", "foot", "sizeTitle", "sizeIntro", "personLabel", "catLabel", "hlLabel", "itemsTitle",
-      "whySummary", "why1", "why2", "why3", "why5", "whySources"].forEach(function (k) {
+      "whySummary", "why1", "why2", "why3", "why5", "whySources", "rodColorLabel", "rodColorNote", "handleColorLabel", "lineColorLabel", "marketHandle", "marketSrcL"].forEach(function (k) {
       var el = $("#" + k);
       if (el) el.textContent = t(k === "affiliateNote" ? "affiliate" : k);
     });
@@ -576,8 +716,38 @@
       (kind === "mat" || kind === "handle" || kind === "line" || kind === "hook" ? '<span class="priceBox" data-p="' + (kind === "mat" ? "mat" : kind) + ":" + o.id + '" aria-disabled="true"></span>' : "") + "</span></label>";
   }
 
+  // Round colour buttons. The first one keeps the part as it is; defKind picks its look ("toy" shows a rainbow).
+  function swatchRow(name, defKind) {
+    var def = t(defKind === "toy" ? "colorAsPictured" : "colorNatural");
+    return '<label class="sw" title="' + esc(def) + '"><input type="radio" name="' + name + '" value="" aria-label="' + esc(def) + '"><span class="dot dot--def' + (defKind === "toy" ? " dot--toy" : "") + '"></span></label>' +
+      D.colors.map(function (o) {
+        return '<label class="sw" title="' + esc(nm(o)) + '"><input type="radio" name="' + name + '" value="' + o.id + '" aria-label="' + esc(nm(o)) + '"><span class="dot" style="background:' + o.hex + '"></span></label>';
+      }).join("");
+  }
+
+  function chipGroup(name, label, list) {
+    return '<div class="itemOpt"><span class="itemOptL" id="' + name + '-l">' + esc(label) + '</span><div class="chips" role="radiogroup" aria-labelledby="' + name + '-l">' +
+      list.map(function (o) { return '<label class="chip"><input type="radio" name="' + name + '" value="' + o.id + '"><span>' + esc(nm(o)) + "</span></label>"; }).join("") + "</div></div>";
+  }
+
+  // Colour for every paintable toy; pattern and filling for dolls.
+  function itemLook(i, toy) {
+    var h = "";
+    if (toy.paint) h += '<div class="itemOpt"><span class="itemOptL" id="ic-' + i + '-l">' + esc(t("itemColor")) + '</span><div class="swatches" role="radiogroup" aria-labelledby="ic-' + i + '-l">' + swatchRow("ic-" + i, "toy") + "</div></div>";
+    if (toy.doll) h += chipGroup("ip-" + i, t("itemPattern"), D.patterns) + chipGroup("if-" + i, t("itemFill"), D.fills) + '<small class="fillNote" data-fnote="' + i + '"></small>';
+    return h;
+  }
+
+  function checkRadios(root, name, val) {
+    var ins = root.querySelectorAll('input[name="' + name + '"]'), k;
+    for (k = 0; k < ins.length; k++) ins[k].checked = ins[k].value === val;
+  }
+
   function buildLists() {
     thickSig = ""; itemSig = "";
+    $("#rodColorOpts").innerHTML = swatchRow("rodColor", "rod");
+    $("#handleColorOpts").innerHTML = swatchRow("handleColor", "handle");
+    $("#lineColorOpts").innerHTML = swatchRow("lineColor", "line");
     $("#matOpts").innerHTML = D.materials.map(function (o) { return radio("material", o, "mat"); }).join("");
     $("#handleOpts").innerHTML = D.handles.map(function (o) {
       return radio("handle", o, "handle", o.feel[lang] + (o.d ? " Ø " + o.d + " " + t("mm") : ""));
@@ -593,7 +763,7 @@
         "</b><small>" + esc(t("catBody", { b: o.body, kg: o.kg })) + "</small></span></label>";
     }).join("");
     $("#toyGrid").innerHTML = D.toys.map(function (o) {
-      return '<div class="toy" data-toy="' + o.id + '"><svg viewBox="-26 -2 52 54" aria-hidden="true">' + TOY[o.id] + "</svg>" +
+      return '<div class="toy" data-toy="' + o.id + '"><svg viewBox="-26 -2 52 54" aria-hidden="true">' + toyInner(newItem(o.id, 0)) + "</svg>" +
         "<b>" + esc(nm(o)) + '</b><small data-w="toy:' + o.id + '"></small><span class="priceBox" data-p="toy:' + o.id + '" aria-disabled="true"></span>' +
         '<div class="stepper"><button type="button" data-act="dec" data-id="' + o.id + '" aria-label="' + esc(t("remove", { name: nm(o) })) + '"><span aria-hidden="true">−</span></button>' +
         '<span data-qty="' + o.id + '">0</span>' +
@@ -621,11 +791,11 @@
       if (!state.items.length) box.innerHTML = '<li class="empty">' + esc(t("noItems")) + "</li>";
       else box.innerHTML = state.items.map(function (it, i) {
         var toy = find(D.toys, it.id);
-        return '<li class="itemRow"><svg class="ico" viewBox="-26 -2 52 54" aria-hidden="true">' + TOY[it.id] + '</svg><div class="itemMain">' +
-          '<div class="itemHead"><b>' + esc(nm(toy)) + "</b><small>" + fmt(toy.g) + ' g</small><button type="button" class="rm" data-rm="' + i + '" aria-label="' + esc(t("removeItem", { name: nm(toy) })) + '"><span aria-hidden="true">×</span></button></div>' +
+        return '<li class="itemRow"><svg class="ico" viewBox="-26 -2 52 54" aria-hidden="true"></svg><div class="itemMain">' +
+          '<div class="itemHead"><b>' + esc(nm(toy)) + '</b><small data-itg="' + i + '">' + fmt(toy.g) + ' g</small><button type="button" class="rm" data-rm="' + i + '" aria-label="' + esc(t("removeItem", { name: nm(toy) })) + '"><span aria-hidden="true">×</span></button></div>' +
           (state.strLen > 0 ? '<div class="itemPos"><label for="pos-' + i + '">' + esc(t("posLabel")) + '</label><output data-posout="' + i + '" for="pos-' + i + '"></output></div>' +
           '<input id="pos-' + i + '" class="range" type="range" min="0" max="' + state.strLen + '" step="1" data-pos="' + i + '">' +
-          '<button type="button" class="endBtn" data-end="' + i + '">' + esc(t("endBtn")) + "</button>" : '<small class="tipOnly">' + esc(t("atTip")) + "</small>") + "</div></li>";
+          '<button type="button" class="endBtn" data-end="' + i + '">' + esc(t("endBtn")) + "</button>" : '<small class="tipOnly">' + esc(t("atTip")) + "</small>") + itemLook(i, toy) + "</div></li>";
       }).join("");
     }
     state.items.forEach(function (it, i) {
@@ -633,6 +803,14 @@
       if (r && +r.value !== it.at) r.value = it.at;
       if (o) o.textContent = it.at >= state.strLen ? t("atEnd") : t("atFrom", { at: it.at });
       if (eb) eb.hidden = it.at >= state.strLen;
+
+      // colour, pattern and filling are discrete choices, so only their state and the picture are refreshed
+      var row = box.children[i], fl = find(D.fills, it.f), fn = row && row.querySelector("[data-fnote]"), ig = row && row.querySelector("[data-itg]");
+      if (!row || !row.classList.contains("itemRow")) return;
+      row.querySelector(".ico").innerHTML = toyInner(it);
+      if (ig) ig.textContent = fmt(toyG(it)) + " g";
+      checkRadios(row, "ic-" + i, it.c); checkRadios(row, "ip-" + i, it.p); checkRadios(row, "if-" + i, it.f);
+      if (fn) fn.textContent = fl.feel[lang] + (fl.dg || fl.price ? " (+" + fmt(fl.dg) + " g, +฿ " + fl.price + ")" : "");
     });
   }
 
@@ -666,7 +844,8 @@
     $("#lineTypeBox").hidden = state.strLen === 0;
     setText("#hlOut", state.handleLen + " " + t("cm"));
     setText("#personOut", state.person + " " + t("cm"));
-    [["material", state.material], ["rodD", state.rodD], ["handle", state.handle], ["hMode", state.hMode], ["strType", state.strType], ["hook", state.hook], ["cat", state.cat]].forEach(function (p) {
+    [["material", state.material], ["rodD", state.rodD], ["handle", state.handle], ["hMode", state.hMode], ["strType", state.strType], ["hook", state.hook], ["cat", state.cat],
+      ["rodColor", state.rodColor], ["handleColor", state.handleColor], ["lineColor", state.lineColor]].forEach(function (p) {
       var inputs = document.querySelectorAll('input[name="' + p[0] + '"]');
       for (i = 0; i < inputs.length; i++) inputs[i].checked = inputs[i].value === String(p[1]);
     });
@@ -705,6 +884,10 @@
     renderItems();
 
     $("#hModeBox").hidden = !!c.h.bare;
+    $("#handleColorBox").hidden = !!c.h.bare;
+    $("#rodColorOpts .dot--def").style.background = c.m.color;
+    $("#handleColorOpts .dot--def").style.background = c.h.color;
+    $("#lineColorOpts .dot--def").style.background = c.ln.color;
     setText("#hmNote", c.h.bare ? t("hmNoteBare", { len: state.length }) :
       t(c.joined ? "hmNoteJoined" : "hmNoteCover", { total: c.totalLen, len: state.length, hl: state.handleLen, free: c.free }));
     setText("#headline", t("headline", { mat: nm(c.m), len: state.length }));
@@ -761,18 +944,21 @@
       '<a class="btn" href="' + esc(shopeeUrl(kw)) + '" target="_blank" rel="noopener sponsored">' + esc(t("searchShopee")) + "</a></li>";
   }
 
+  function colorSuffix(id) { return id ? " · " + colorName(id) : ""; }
+  function kwColor(kw, id) { var o = id ? find(D.colors, id) : null; return o ? kw + " สี" + o.kw : kw; }
+
   function renderParts(c) {
-    var rows = [], counts = countBy(state);
-    rows.push(partRow("rod-" + c.m.id + "-" + state.rodD, t("rodPart", { mat: nm(c.m), d: state.rodD }), t("cutTo", { len: state.length }), c.m.kw.split("{d}").join(state.rodD), iconSvg("rod", c.m, c.m), priceOf("mat", c.m.id)));
-    if (!c.h.bare) rows.push(partRow("handle-" + c.h.id, t("handleLine", { handle: nm(c.h) }), t(c.joined ? "handlePartJoined" : "handlePartSpec", { len: state.handleLen }), c.h.kw, iconSvg("handle", c.h, c.h), priceOf("handle", c.h.id)));
-    if (state.strLen > 0) rows.push(partRow("line-" + c.ln.id, nm(c.ln), t("lenOnly", { len: state.strLen }), c.ln.kw, iconSvg("line", c.ln, c.ln), priceOf("line", c.ln.id)));
+    var rows = [];
+    rows.push(partRow("rod-" + c.m.id + "-" + state.rodD, t("rodPart", { mat: nm(c.m), d: state.rodD }), t("cutTo", { len: state.length }) + colorSuffix(state.rodColor), c.m.kw.split("{d}").join(state.rodD), iconSvg("rod", c.m, tinted(c.m, state.rodColor)), priceOf("mat", c.m.id)));
+    if (!c.h.bare) rows.push(partRow("handle-" + c.h.id, t("handleLine", { handle: nm(c.h) }), t(c.joined ? "handlePartJoined" : "handlePartSpec", { len: state.handleLen }) + colorSuffix(state.handleColor), kwColor(c.h.kw, state.handleColor), iconSvg("handle", c.h, tinted(c.h, state.handleColor)), priceOf("handle", c.h.id)));
+    if (state.strLen > 0) rows.push(partRow("line-" + c.ln.id, nm(c.ln), t("lenOnly", { len: state.strLen }) + colorSuffix(state.lineColor), kwColor(c.ln.kw, state.lineColor), iconSvg("line", c.ln, tinted(c.ln, state.lineColor)), priceOf("line", c.ln.id)));
     if (c.hk.g) {
       rows.push(partRow("hook-" + c.hk.id, nm(c.hk), t("pieces", { q: c.n }) + " " + t("hookPerToy"), c.hk.kw, iconSvg("hook", c.hk, c.hk.id), c.hk.price * c.n));
       rows.push(partRow("tipfit", nm(D.tipFit), t("tipFitSpec"), D.tipFit.kw, iconSvg("tipfit", D.tipFit), D.tipFit.price));
     }
-    D.toys.forEach(function (toy) {
-      var q = counts[toy.id] || 0;
-      if (q) rows.push(partRow("toy-" + toy.id, nm(toy), t("pieces", { q: q }), toy.kw, iconSvg("toy", toy, toy.id), toy.price * q));
+    groupItems(state.items).forEach(function (g) {
+      var toy = find(D.toys, g.it.id), look = lookParts(g.it);
+      rows.push(partRow("toy-" + g.key, nm(toy) + (look.length ? " (" + look.join(", ") + ")" : ""), t("pieces", { q: g.q }), toyKw(g.it), iconSvg("toy", toy, g.it), toyPrice(g.it) * g.q));
     });
     $("#partsList").innerHTML = rows.join("");
     $("#suppliesList").innerHTML = D.extras.map(function (e) { return partRow("x-" + e.id, nm(e), "", e.kw, iconSvg(e.id, e), e.price); }).join("");
@@ -824,15 +1010,19 @@
 
   /* order */
   function orderText() {
-    var c = calc(state), p = prices(state), items = [], counts = countBy(state);
-    D.toys.forEach(function (toy) {
-      var at = state.items.filter(function (it) { return it.id === toy.id; }).map(function (it) { return state.strLen === 0 ? t("atTip") : it.at >= state.strLen ? t("atEnd") : t("atFrom", { at: it.at }); });
-      if (at.length) items.push(nm(toy) + " × " + counts[toy.id] + " (" + at.join(", ") + ")");
+    var c = calc(state), p = prices(state), items = [], hues = [];
+    state.items.forEach(function (it) {
+      var at = state.strLen === 0 ? t("atTip") : it.at >= state.strLen ? t("atEnd") : t("atFrom", { at: it.at }), look = lookParts(it);
+      items.push(nm(find(D.toys, it.id)) + (look.length ? " [" + look.join(", ") + "]" : "") + " (" + at + ")");
+    });
+    [["rodColorLabel", state.rodColor], ["handleColorLabel", state.handleColor], ["lineColorLabel", state.lineColor]].forEach(function (x) {
+      if (x[1]) hues.push(t(x[0]) + " " + colorName(x[1]));
     });
     var L = [t("orderHead"), "",
       t("oSpec") + ": " + t("headline", { mat: nm(c.m), len: state.length }) + ", " + state.rodD + " " + t("mm"),
       t("handleLine", { handle: nm(c.h) }) + " " + state.handleLen + " " + t("cm") + (c.h.bare ? "" : " (" + t(c.joined ? "hm_joined" : "hm_cover") + ")") + ", " + (state.strLen > 0 ? t("lineLine", { line: nm(c.ln), len: state.strLen }) : t("noLine")),
       t("hookLabel") + ": " + nm(c.hk),
+      t("oColors") + ": " + (hues.length ? hues.join(", ") : t("oNone")),
       t("oItems") + ": " + (items.length ? items.join("; ") : t("oNone")),
       t("spec", { total: fmt(c.total), bal: fmt(c.balance) }),
       t("oTotal") + ": " + p.total + " " + t("baht"), "",
@@ -868,6 +1058,9 @@
     else if (n === "strType") state.strType = el.value;
     else if (n === "hook") state.hook = el.value;
     else if (n === "cat") state.cat = el.value;
+    else if (n === "rodColor") state.rodColor = el.value;
+    else if (n === "handleColor") state.handleColor = el.value;
+    else if (n === "lineColor") state.lineColor = el.value;
     else if (el.id === "lenRange") state.length = snap(+el.value, D.length);
     else if (el.id === "lineRange") setStrLen(snap(+el.value, D.line));
     else if (el.id === "hlRange") state.handleLen = snap(+el.value, D.handleLen);
@@ -891,6 +1084,8 @@
         update(true); return;
       }
       if (el.getAttribute("data-chk")) { checked[el.getAttribute("data-chk")] = el.checked; return; }
+      var lk = /^(ic|ip|if)-(\d+)$/.exec(el.name || "");   // colour, pattern or filling of one toy on the line
+      if (lk && state.items[+lk[2]]) { state.items[+lk[2]][{ ic: "c", ip: "p", "if": "f" }[lk[1]]] = el.value; update(true); return; }
       if (applyControl(el)) update(true);
     });
     panel.addEventListener("input", function (e) {
@@ -907,7 +1102,7 @@
       if (!b || b.disabled) return;
       var id = b.getAttribute("data-id"), k;
       if (b.getAttribute("data-act") === "inc") {
-        if (state.items.length < C.MAX_ATTACH) state.items.push({ id: id, at: state.strLen });
+        if (state.items.length < C.MAX_ATTACH) state.items.push(newItem(id, state.strLen));
       } else {
         for (k = state.items.length - 1; k >= 0; k--) if (state.items[k].id === id) { state.items.splice(k, 1); break; }
       }
