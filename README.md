@@ -60,6 +60,10 @@ Each part shows a greyed, read-only price box, and a cost estimate (DIY, without
 
 The cat safety list changes with the build: braided nylon, metal rings, clasps and swivels, wire and plastic-tube rods, and small toy parts each raise a warning, and soft cotton cord is recommended. Source on string and thread swallowing: VCA Animal Hospitals, "Linear Foreign Body in Cats".
 
+## No-line wands
+
+Set the line length to 0 and the toys tie straight onto the rod tip, like some ready-made wands. The line type, line price and toy position sliders are hidden, and a short note and safety tip explain it.
+
 ## How the size guide works
 
 - The picture is drawn at 1 unit = 1 cm. The person is a simple figure scaled to the chosen height, the cat is a typical cat (about 40 cm chest to rump) scaled for kitten or large.

@@ -44,7 +44,7 @@ window.CONFIG = {
 
 window.CATALOG = {
   length: { min: 30, max: 120, step: 5, def: 60 },
-  line: { min: 20, max: 80, step: 5, def: 40 },
+  line: { min: 0, max: 80, step: 5, def: 40 },   // 0 = no line, toys tie straight onto the rod tip
   handleLen: { min: 8, max: 20, step: 1, def: 14 },
 
   // Size guide. Person height range in cm. Cats are grouped by weight (kg);

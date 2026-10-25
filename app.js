@@ -54,7 +54,8 @@
     if (find(D.handles, q.get("h"))) s.handle = q.get("h");
     s.hMode = q.get("hm") === "joined" ? "joined" : "cover";
     s.handleLen = snap(parseFloat(q.get("hl")) || D.handleLen.def, D.handleLen);
-    s.strLen = snap(parseFloat(q.get("sl")) || D.line.def, D.line);
+    var slv = parseFloat(q.get("sl"));
+    s.strLen = snap(isNaN(slv) ? D.line.def : slv, D.line);
     if (find(D.lines, q.get("st"))) s.strType = q.get("st");
     if (find(D.hooks, q.get("hk"))) s.hook = q.get("hk");
     s.person = snap(parseFloat(q.get("ph")) || D.person.def, D.person);
@@ -116,7 +117,8 @@
     var warn = [], tip = [], small = false;
     state.items.forEach(function (it) { if (it.id === "bell" || it.id === "pompom" || it.id === "feather") small = true; });
     function add(list, key) { list.push({ title: t(key + "_t"), text: t(key) }); }
-    if (state.strType === "braid") add(warn, "s_braid"); else add(tip, "s_cotton");
+    if (state.strLen === 0) add(tip, "s_noline");
+    else if (state.strType === "braid") add(warn, "s_braid"); else add(tip, "s_cotton");
     if (c.hk.g) { add(warn, "s_metal"); if (c.hk.id === "clip") add(warn, "s_clip"); }
     if (state.material === "wire") add(warn, "s_wire");
     if (state.material === "tube") add(warn, "s_tube");
@@ -207,7 +209,7 @@
     var c = calc(s), rows = [], counts = {};
     rows.push({ label: t("rodLine", { mat: nm(c.m), len: s.length }), v: Math.round(c.m.base + c.m.perCm * s.length) });
     if (!c.h.bare) rows.push({ label: t("handleLine", { handle: nm(c.h) }), v: c.h.price });
-    rows.push({ label: t("lineLine", { line: nm(c.ln), len: s.strLen }), v: Math.round(c.ln.perCm * s.strLen) });
+    if (s.strLen > 0) rows.push({ label: t("lineLine", { line: nm(c.ln), len: s.strLen }), v: Math.round(c.ln.perCm * s.strLen) });
     s.items.forEach(function (it) { counts[it.id] = (counts[it.id] || 0) + 1; });
     D.toys.forEach(function (toy) {
       var q = counts[toy.id] || 0;
@@ -426,7 +428,7 @@
 
     // line length marker
     var mxl = tip.x + maxDx + 52;
-    svg += '<g stroke="rgba(255,255,255,.7)" stroke-width="1.5" fill="none"><line x1="' + mxl.toFixed(1) + '" y1="' + tip.y.toFixed(1) + '" x2="' + mxl.toFixed(1) + '" y2="' + (tip.y + spx).toFixed(1) + '" stroke-dasharray="5 5"/>' +
+    if (state.strLen > 0) svg += '<g stroke="rgba(255,255,255,.7)" stroke-width="1.5" fill="none"><line x1="' + mxl.toFixed(1) + '" y1="' + tip.y.toFixed(1) + '" x2="' + mxl.toFixed(1) + '" y2="' + (tip.y + spx).toFixed(1) + '" stroke-dasharray="5 5"/>' +
       '<line x1="' + (mxl - 6).toFixed(1) + '" y1="' + tip.y.toFixed(1) + '" x2="' + (mxl + 6).toFixed(1) + '" y2="' + tip.y.toFixed(1) + '"/>' +
       '<line x1="' + (mxl - 6).toFixed(1) + '" y1="' + (tip.y + spx).toFixed(1) + '" x2="' + (mxl + 6).toFixed(1) + '" y2="' + (tip.y + spx).toFixed(1) + '"/></g>' +
       '<text x="' + (mxl + 12).toFixed(1) + '" y="' + (tip.y + spx / 2 + 5).toFixed(1) + '" fill="#fff" font-size="16" font-weight="600" style="font-family:var(--font-body)">' + esc(t("ruleLine", { len: state.strLen })) + "</text>";
@@ -538,7 +540,7 @@
     setText("#gRodLabel", t("gRod"));
     setText("#gWristLabel", t("gWrist"));
     setText("#vCatL", t("chkCat") + " "); setText("#vRodL", t("chkRod") + " "); setText("#vWristL", t("chkWrist") + " "); setText("#vGripL", t("chkGrip") + " ");
-    ["s1", "s2", "s3", "s4", "s5", "lenLabel", "matLabel", "thickLabel", "lineLenLabel", "hModeLabel", "hookLabel", "hookNote", "lineTypeLabel", "safetyTitle", "safeSrcL", "estTitle", "estNote", "estMoreS",
+    ["s1", "s2", "s3", "s4", "s5", "lenLabel", "matLabel", "thickLabel", "lineLenLabel", "hModeLabel", "hookLabel", "hookNote", "lineNote", "lineTypeLabel", "safetyTitle", "safeSrcL", "estTitle", "estNote", "estMoreS",
       "nameLabel", "myDesignsTitle", "shopeeIntro", "partsTitle", "suppliesTitle", "stepsTitle", "affiliateNote",
       "priceTitle", "priceNote", "foot", "sizeTitle", "sizeIntro", "personLabel", "catLabel", "hlLabel", "itemsTitle",
       "whySummary", "why1", "why2", "why3", "why5", "whySources"].forEach(function (k) {
@@ -621,9 +623,9 @@
         var toy = find(D.toys, it.id);
         return '<li class="itemRow"><svg class="ico" viewBox="-26 -2 52 54" aria-hidden="true">' + TOY[it.id] + '</svg><div class="itemMain">' +
           '<div class="itemHead"><b>' + esc(nm(toy)) + "</b><small>" + fmt(toy.g) + ' g</small><button type="button" class="rm" data-rm="' + i + '" aria-label="' + esc(t("removeItem", { name: nm(toy) })) + '"><span aria-hidden="true">×</span></button></div>' +
-          '<div class="itemPos"><label for="pos-' + i + '">' + esc(t("posLabel")) + '</label><output data-posout="' + i + '" for="pos-' + i + '"></output></div>' +
+          (state.strLen > 0 ? '<div class="itemPos"><label for="pos-' + i + '">' + esc(t("posLabel")) + '</label><output data-posout="' + i + '" for="pos-' + i + '"></output></div>' +
           '<input id="pos-' + i + '" class="range" type="range" min="0" max="' + state.strLen + '" step="1" data-pos="' + i + '">' +
-          '<button type="button" class="endBtn" data-end="' + i + '">' + esc(t("endBtn")) + "</button></div></li>";
+          '<button type="button" class="endBtn" data-end="' + i + '">' + esc(t("endBtn")) + "</button>" : '<small class="tipOnly">' + esc(t("atTip")) + "</small>") + "</div></li>";
       }).join("");
     }
     state.items.forEach(function (it, i) {
@@ -659,7 +661,9 @@
     setRange("#lenRange", state.length); setRange("#lineRange", state.strLen);
     setRange("#hlRange", state.handleLen); setRange("#personRange", state.person);
     setText("#lenOut", state.length + " " + t("cm"));
-    setText("#lineOut", state.strLen + " " + t("cm"));
+    setText("#lineOut", state.strLen > 0 ? state.strLen + " " + t("cm") : t("noLine"));
+    $("#lineNote").hidden = state.strLen > 0;
+    $("#lineTypeBox").hidden = state.strLen === 0;
     setText("#hlOut", state.handleLen + " " + t("cm"));
     setText("#personOut", state.person + " " + t("cm"));
     [["material", state.material], ["rodD", state.rodD], ["handle", state.handle], ["hMode", state.hMode], ["strType", state.strType], ["hook", state.hook], ["cat", state.cat]].forEach(function (p) {
@@ -761,7 +765,7 @@
     var rows = [], counts = countBy(state);
     rows.push(partRow("rod-" + c.m.id + "-" + state.rodD, t("rodPart", { mat: nm(c.m), d: state.rodD }), t("cutTo", { len: state.length }), c.m.kw.split("{d}").join(state.rodD), iconSvg("rod", c.m, c.m), priceOf("mat", c.m.id)));
     if (!c.h.bare) rows.push(partRow("handle-" + c.h.id, t("handleLine", { handle: nm(c.h) }), t(c.joined ? "handlePartJoined" : "handlePartSpec", { len: state.handleLen }), c.h.kw, iconSvg("handle", c.h, c.h), priceOf("handle", c.h.id)));
-    rows.push(partRow("line-" + c.ln.id, nm(c.ln), t("lenOnly", { len: state.strLen }), c.ln.kw, iconSvg("line", c.ln, c.ln), priceOf("line", c.ln.id)));
+    if (state.strLen > 0) rows.push(partRow("line-" + c.ln.id, nm(c.ln), t("lenOnly", { len: state.strLen }), c.ln.kw, iconSvg("line", c.ln, c.ln), priceOf("line", c.ln.id)));
     if (c.hk.g) {
       rows.push(partRow("hook-" + c.hk.id, nm(c.hk), t("pieces", { q: c.n }) + " " + t("hookPerToy"), c.hk.kw, iconSvg("hook", c.hk, c.hk.id), c.hk.price * c.n));
       rows.push(partRow("tipfit", nm(D.tipFit), t("tipFitSpec"), D.tipFit.kw, iconSvg("tipfit", D.tipFit), D.tipFit.price));
@@ -822,12 +826,12 @@
   function orderText() {
     var c = calc(state), p = prices(state), items = [], counts = countBy(state);
     D.toys.forEach(function (toy) {
-      var at = state.items.filter(function (it) { return it.id === toy.id; }).map(function (it) { return it.at >= state.strLen ? t("atEnd") : t("atFrom", { at: it.at }); });
+      var at = state.items.filter(function (it) { return it.id === toy.id; }).map(function (it) { return state.strLen === 0 ? t("atTip") : it.at >= state.strLen ? t("atEnd") : t("atFrom", { at: it.at }); });
       if (at.length) items.push(nm(toy) + " × " + counts[toy.id] + " (" + at.join(", ") + ")");
     });
     var L = [t("orderHead"), "",
       t("oSpec") + ": " + t("headline", { mat: nm(c.m), len: state.length }) + ", " + state.rodD + " " + t("mm"),
-      t("handleLine", { handle: nm(c.h) }) + " " + state.handleLen + " " + t("cm") + (c.h.bare ? "" : " (" + t(c.joined ? "hm_joined" : "hm_cover") + ")") + ", " + t("lineLine", { line: nm(c.ln), len: state.strLen }),
+      t("handleLine", { handle: nm(c.h) }) + " " + state.handleLen + " " + t("cm") + (c.h.bare ? "" : " (" + t(c.joined ? "hm_joined" : "hm_cover") + ")") + ", " + (state.strLen > 0 ? t("lineLine", { line: nm(c.ln), len: state.strLen }) : t("noLine")),
       t("hookLabel") + ": " + nm(c.hk),
       t("oItems") + ": " + (items.length ? items.join("; ") : t("oNone")),
       t("spec", { total: fmt(c.total), bal: fmt(c.balance) }),

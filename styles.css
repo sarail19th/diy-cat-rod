@@ -391,3 +391,20 @@ button, input, textarea { font: inherit; color: inherit; }
   .toyGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .step { padding-inline: 14px; }
 }
+
+/* ---------- price chip on the preview card ---------- */
+.stagePrice {
+  position: absolute; right: 22px; bottom: 14px; z-index: 3;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end;
+  font-size: 13px; color: #fff;
+}
+.priceBox--stage { font-size: 18px; font-family: var(--font-display); font-weight: 700; background: var(--paper); color: var(--ink); border: 1.5px solid rgba(255, 255, 255, 0.8); padding: 3px 12px; border-radius: 12px; cursor: default; }
+.tipOnly { color: var(--ink-soft); font-size: 13px; }
+.estimate { border-top: 1.5px dashed var(--line); padding-top: 8px; display: block; }
+@media (max-width: 959px) {
+  .stagePrice { position: static; grid-area: pic; justify-self: end; align-self: start; margin: 2px 2px 0 0; z-index: 3; gap: 6px; }
+  .stagePriceL { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .priceBox--stage { font-size: 15px; padding: 2px 10px; }
+  .stagePrice .badge { font-size: 10px; padding: 1px 6px; }
+  .stage[data-collapsed="true"] .stagePrice { align-self: center; }
+}

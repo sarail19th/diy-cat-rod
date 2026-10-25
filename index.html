@@ -27,6 +27,11 @@
       </div>
       <svg id="rod" viewBox="0 0 800 500" role="img"></svg>
       <span class="pill" id="pill" data-level="good"></span>
+      <div class="stagePrice" aria-live="polite">
+        <span class="stagePriceL" id="estTitle"></span>
+        <span class="priceBox priceBox--stage" id="estTotal"></span>
+        <span class="badge" id="estBadge"></span>
+      </div>
       <button class="stageToggle" id="stageToggle" type="button" aria-controls="rod" aria-expanded="true"></button>
       <p class="tapHint" id="tapHint"></p>
     </div>
@@ -57,15 +62,11 @@
         <p class="verdict" id="vCat" data-level="good"><b id="vCatL"></b><span id="vCatT"></span></p>
       </div>
 
-      <div class="estimate" id="estimate">
-        <div class="estHead"><span id="estTitle"></span><span class="badge" id="estBadge"></span></div>
-        <div class="priceBox priceBox--big" id="estTotal" aria-live="polite"></div>
+      <details class="estimate estMore">
+        <summary id="estMoreS"></summary>
+        <table class="price"><tbody id="estBody"></tbody></table>
         <p class="fine" id="estNote"></p>
-        <details class="estMore">
-          <summary id="estMoreS"></summary>
-          <table class="price"><tbody id="estBody"></tbody></table>
-        </details>
-      </div>
+      </details>
 
       <details class="why">
         <summary id="whySummary"></summary>
@@ -142,8 +143,11 @@
       </div>
       <input type="range" id="lineRange" class="range">
       <div class="rangeEnds"><span id="lineMin"></span><span id="lineMax"></span></div>
-      <p class="groupLabel" id="lineTypeLabel"></p>
-      <div class="opts" id="lineOpts" role="radiogroup" aria-labelledby="lineTypeLabel"></div>
+      <p class="fine" id="lineNote" hidden></p>
+      <div id="lineTypeBox">
+        <p class="groupLabel" id="lineTypeLabel"></p>
+        <div class="opts" id="lineOpts" role="radiogroup" aria-labelledby="lineTypeLabel"></div>
+      </div>
       <p class="groupLabel" id="hookLabel"></p>
       <div class="opts" id="hookOpts" role="radiogroup" aria-labelledby="hookLabel"></div>
       <p class="fine" id="hookNote"></p>
