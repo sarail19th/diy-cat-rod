@@ -64,6 +64,24 @@
       <div class="opts" id="matOpts" role="radiogroup" aria-labelledby="matLabel"></div>
     </fieldset>
 
+    <fieldset class="step sizeStep">
+      <legend><span id="sizeTitle"></span></legend>
+      <p class="fine intro" id="sizeIntro"></p>
+      <svg id="scaleSvg" viewBox="-50 -206 300 222" role="img"></svg>
+      <p class="sizeSummary" id="sizeSummary" aria-live="polite"></p>
+      <p class="verdict" id="sizeVerdict" data-level="good" aria-live="polite"></p>
+      <button class="btn" id="sizeFix" type="button" hidden></button>
+      <div class="sliderRow">
+        <label for="personRange" id="personLabel"></label>
+        <output id="personOut" for="personRange"></output>
+      </div>
+      <input type="range" id="personRange" class="range">
+      <div class="rangeEnds"><span id="personMin"></span><span id="personMax"></span></div>
+      <p class="groupLabel" id="catLabel"></p>
+      <div class="opts opts--chips" id="catOpts" role="radiogroup" aria-labelledby="catLabel"></div>
+      <p class="fine" id="sizeFine"></p>
+    </fieldset>
+
     <fieldset class="step">
       <legend><span class="stepNum">2</span><span id="s2"></span></legend>
       <div class="opts opts--chips" id="handleOpts" role="radiogroup" aria-labelledby="s2"></div>

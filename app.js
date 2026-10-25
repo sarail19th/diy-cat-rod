@@ -24,13 +24,13 @@
 
   /* ---------------- state ---------------- */
   function defaults() {
-    return { length: D.length.def, material: "bamboo", handle: "foam", strLen: D.line.def, strType: "cotton", items: { fish: 1, ribbon: 1 } };
+    return { length: D.length.def, material: "bamboo", handle: "foam", strLen: D.line.def, strType: "cotton", person: D.person.def, cat: "adult", items: { fish: 1, ribbon: 1 } };
   }
 
   function serialize(s) {
     var items = Object.keys(s.items).filter(function (k) { return s.items[k] > 0; })
       .map(function (k) { return k + ":" + s.items[k]; }).join(",");
-    return new URLSearchParams({ l: s.length, m: s.material, h: s.handle, sl: s.strLen, st: s.strType, i: items }).toString();
+    return new URLSearchParams({ l: s.length, m: s.material, h: s.handle, sl: s.strLen, st: s.strType, ph: s.person, cs: s.cat, i: items }).toString();
   }
 
   function parse(qs) {
@@ -42,6 +42,8 @@
     if (find(D.handles, q.get("h"))) s.handle = q.get("h");
     s.strLen = snap(parseFloat(q.get("sl")) || D.line.def, D.line);
     if (find(D.lines, q.get("st"))) s.strType = q.get("st");
+    s.person = snap(parseFloat(q.get("ph")) || D.person.def, D.person);
+    if (find(D.cats, q.get("cs"))) s.cat = q.get("cs");
     s.items = {};
     var left = C.MAX_ATTACH;
     (q.get("i") || "").split(",").forEach(function (pair) {
@@ -217,6 +219,90 @@
     el.setAttribute("aria-label", t("svgLabel", { mat: nm(c.m), len: L, handle: nm(c.h), line: state.strLen }));
   }
 
+  /* ---------------- size guide (to scale, 1 unit = 1 cm) ---------------- */
+  function sizeRange(h) {
+    var lo = Math.max(D.length.min, Math.ceil(0.25 * h / 5) * 5);
+    var hi = Math.min(D.length.max, Math.floor(0.5 * h / 5) * 5);
+    var mid = clamp(Math.round((lo + hi) / 2 / 5) * 5, lo, hi);
+    return { lo: lo, hi: hi, mid: mid };
+  }
+
+  var CAT_SVG = '<g fill="#0F6E6A"><ellipse cx="0" cy="-17" rx="20" ry="9"/><rect x="-17" y="-15" width="5.5" height="15" rx="2.7"/><rect x="-10" y="-15" width="5.5" height="15" rx="2.7"/><ellipse cx="13" cy="-12" rx="7.5" ry="8.5"/><rect x="9.5" y="-7" width="5.5" height="7" rx="2.7"/><rect x="15.5" y="-7" width="5.5" height="7" rx="2.7"/><circle cx="-24" cy="-28" r="8.5"/><path d="M-31 -31 L-30 -41 L-23.5 -35Z"/><path d="M-24.5 -35.5 L-18.5 -40 L-17.5 -31.5Z"/><path d="M19 -20 C30 -22 34 -34 28 -42" fill="none" stroke="#0F6E6A" stroke-width="4" stroke-linecap="round"/></g><circle cx="-28" cy="-29" r="1.4" fill="#fff"/>';
+
+  function renderScale(c) {
+    var h = state.person, L = state.length, cat = find(D.cats, state.cat), k = cat.k, ink = "#1B2347", soft = "#4A5272", i, s = "";
+    var font = 'style="font-family:var(--font-body)"';
+
+    // floor and 50 cm grid
+    s += '<rect x="-50" y="0" width="300" height="16" fill="rgba(27,35,71,.07)"/>';
+    for (i = 50; i <= 200; i += 50) {
+      s += '<line x1="-50" y1="' + -i + '" x2="250" y2="' + -i + '" stroke="rgba(27,35,71,.22)" stroke-width=".6" stroke-dasharray="3 3"/>' +
+        '<text x="-48" y="' + (-i + 8) + '" font-size="7.5" fill="' + soft + '" ' + font + ">" + i + "</text>";
+    }
+    s += '<line x1="-50" y1="0" x2="250" y2="0" stroke="' + ink + '" stroke-width=".8"/>';
+
+    // person
+    var hr = 0.062 * h, shY = -0.82 * h, hipY = -0.47 * h, hx = 0.27 * h, hy = -0.6 * h;
+    s += '<g fill="' + ink + '" stroke="' + ink + '" stroke-linecap="round" stroke-linejoin="round">' +
+      '<circle cx="0" cy="' + (-(h - hr)).toFixed(1) + '" r="' + hr.toFixed(1) + '" stroke="none"/>' +
+      '<rect x="' + (-0.025 * h).toFixed(1) + '" y="' + (-(h - 2 * hr)).toFixed(1) + '" width="' + (0.05 * h).toFixed(1) + '" height="' + (0.07 * h).toFixed(1) + '" stroke="none"/>' +
+      '<rect x="' + (-0.13 * h).toFixed(1) + '" y="' + shY.toFixed(1) + '" width="' + (0.26 * h).toFixed(1) + '" height="' + (hipY - shY).toFixed(1) + '" rx="' + (0.05 * h).toFixed(1) + '" stroke="none"/>' +
+      '<rect x="' + (-0.12 * h).toFixed(1) + '" y="' + hipY.toFixed(1) + '" width="' + (0.1 * h).toFixed(1) + '" height="' + (-hipY).toFixed(1) + '" rx="' + (0.04 * h).toFixed(1) + '" stroke="none"/>' +
+      '<rect x="' + (0.02 * h).toFixed(1) + '" y="' + hipY.toFixed(1) + '" width="' + (0.1 * h).toFixed(1) + '" height="' + (-hipY).toFixed(1) + '" rx="' + (0.04 * h).toFixed(1) + '" stroke="none"/>' +
+      '<line x1="' + (-0.14 * h).toFixed(1) + '" y1="' + (shY + 0.03 * h).toFixed(1) + '" x2="' + (-0.16 * h).toFixed(1) + '" y2="' + (-0.5 * h).toFixed(1) + '" stroke-width="' + (0.065 * h).toFixed(1) + '"/>' +
+      '<polyline fill="none" stroke-width="' + (0.065 * h).toFixed(1) + '" points="' + (0.14 * h).toFixed(1) + "," + (shY + 0.03 * h).toFixed(1) + " " + (0.2 * h).toFixed(1) + "," + (-0.64 * h).toFixed(1) + " " + hx.toFixed(1) + "," + hy.toFixed(1) + '"/></g>';
+
+    // wand held at the hand: 15 cm handle behind, rod L cm ahead, 22 degrees up
+    var a = -22 * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a);
+    var bx = hx - 15 * ca, by = hy - 15 * sa, fx = hx + 3 * ca, fy = hy + 3 * sa;
+    var tx = hx + L * ca, ty = hy + L * sa;
+    s += '<line x1="' + bx.toFixed(1) + '" y1="' + by.toFixed(1) + '" x2="' + fx.toFixed(1) + '" y2="' + fy.toFixed(1) + '" stroke="rgba(27,35,71,.55)" stroke-width="4.6" stroke-linecap="round"/>' +
+      '<line x1="' + bx.toFixed(1) + '" y1="' + by.toFixed(1) + '" x2="' + fx.toFixed(1) + '" y2="' + fy.toFixed(1) + '" stroke="' + c.h.color + '" stroke-width="3.4" stroke-linecap="round"/>' +
+      '<line x1="' + fx.toFixed(1) + '" y1="' + fy.toFixed(1) + '" x2="' + tx.toFixed(1) + '" y2="' + ty.toFixed(1) + '" stroke="rgba(27,35,71,.55)" stroke-width="3" stroke-linecap="round"/>' +
+      '<line x1="' + fx.toFixed(1) + '" y1="' + fy.toFixed(1) + '" x2="' + tx.toFixed(1) + '" y2="' + ty.toFixed(1) + '" stroke="' + c.m.color + '" stroke-width="2" stroke-linecap="round"/>';
+
+    // length ruler above the rod
+    var nx = sa, ny = -ca, off = 10;
+    var rsx = hx + nx * off, rsy = hy + ny * off, rex = rsx + L * ca, rey = rsy + L * sa;
+    var mx = (rsx + rex) / 2 + nx * 6, my = (rsy + rey) / 2 + ny * 6;
+    s += '<g stroke="' + ink + '" stroke-width=".8" fill="none"><line x1="' + rsx.toFixed(1) + '" y1="' + rsy.toFixed(1) + '" x2="' + rex.toFixed(1) + '" y2="' + rey.toFixed(1) + '" stroke-dasharray="3 3"/>' +
+      '<line x1="' + (rsx - nx * 3).toFixed(1) + '" y1="' + (rsy - ny * 3).toFixed(1) + '" x2="' + (rsx + nx * 3).toFixed(1) + '" y2="' + (rsy + ny * 3).toFixed(1) + '"/>' +
+      '<line x1="' + (rex - nx * 3).toFixed(1) + '" y1="' + (rey - ny * 3).toFixed(1) + '" x2="' + (rex + nx * 3).toFixed(1) + '" y2="' + (rey + ny * 3).toFixed(1) + '"/></g>' +
+      '<text x="' + mx.toFixed(1) + '" y="' + my.toFixed(1) + '" text-anchor="middle" transform="rotate(-22 ' + mx.toFixed(1) + " " + my.toFixed(1) + ')" font-size="9" font-weight="600" fill="' + ink + '" ' + font + ">" + esc(t("ruleRod", { len: L })) + "</text>";
+
+    // line and toys at real size (the toy drawings are about 0.2 cm per unit)
+    var list = [];
+    D.toys.forEach(function (toy) { for (var q = 0; q < (state.items[toy.id] || 0); q++) list.push(toy.id); });
+    var n = list.length, ly = ty + state.strLen;
+    s += '<line x1="' + tx.toFixed(1) + '" y1="' + ty.toFixed(1) + '" x2="' + tx.toFixed(1) + '" y2="' + ly.toFixed(1) + '" stroke="' + soft + '" stroke-width=".9" stroke-linecap="round"/>';
+    list.forEach(function (id, j) {
+      var px = (j - (n - 1) / 2) * 7, py = 3 + Math.abs(px) * 0.18 + (j % 2) * 2;
+      s += '<line x1="' + tx.toFixed(1) + '" y1="' + ly.toFixed(1) + '" x2="' + (tx + px).toFixed(1) + '" y2="' + (ly + py).toFixed(1) + '" stroke="' + soft + '" stroke-width=".6"/>' +
+        '<g transform="translate(' + (tx + px).toFixed(1) + "," + (ly + py).toFixed(1) + ') scale(.2)">' + TOY[id] + "</g>";
+    });
+
+    // cat under the toy, facing the person
+    var cx = tx + 28 * k;
+    s += '<g transform="translate(' + cx.toFixed(1) + ',0) scale(' + k + ')">' + CAT_SVG + "</g>";
+
+    // labels
+    s += '<text x="0" y="12" text-anchor="middle" font-size="9" font-weight="600" fill="' + ink + '" ' + font + ">" + esc(t("you", { h: h })) + "</text>" +
+      '<text x="' + cx.toFixed(1) + '" y="12" text-anchor="middle" font-size="9" font-weight="600" fill="' + ink + '" ' + font + ">" + esc(nm(cat)) + "</text>";
+
+    var el = $("#scaleSvg");
+    el.innerHTML = s;
+    el.setAttribute("aria-label", t("sizeSvg", { h: h, len: L, cat: nm(cat) }));
+
+    // guidance text
+    var r = sizeRange(h), pct = Math.round(L / h * 100), x = fmt(L / cat.body);
+    setText("#sizeSummary", t("sizeSummary", { len: L, pct: pct, x: x }));
+    var key = L < r.lo ? "sizeShort" : L > r.hi ? "sizeLong" : "sizeFit";
+    setText("#sizeVerdict", t(key, { lo: r.lo, hi: r.hi }));
+    $("#sizeVerdict").setAttribute("data-level", key === "sizeFit" ? "good" : "warn");
+    $("#sizeFix").hidden = key === "sizeFit";
+    setText("#sizeFix", t("sizeFix", { mid: r.mid }));
+  }
+
   /* ---------------- static + list building ---------------- */
   var checked = {};
 
@@ -233,11 +319,12 @@
     setText("#gTotalLabel", t("gTotal"));
     ["s1", "s2", "s3", "s4", "s5", "lenLabel", "matLabel", "lineLenLabel", "lineTypeLabel", "safety",
       "nameLabel", "myDesignsTitle", "shopeeIntro", "partsTitle", "suppliesTitle", "stepsTitle", "affiliateNote",
-      "priceTitle", "priceNote", "foot"].forEach(function (k) {
+      "priceTitle", "priceNote", "foot", "sizeTitle", "sizeIntro", "personLabel", "catLabel", "sizeFine"].forEach(function (k) {
       var el = $("#" + k);
       if (el) el.textContent = t(k === "affiliateNote" ? "affiliate" : k);
     });
     setText("#lenMin", D.length.min + " " + t("cm")); setText("#lenMax", D.length.max + " " + t("cm"));
+    setText("#personMin", D.person.min + " " + t("cm")); setText("#personMax", D.person.max + " " + t("cm"));
     setText("#lineMin", D.line.min + " " + t("cm")); setText("#lineMax", D.line.max + " " + t("cm"));
     setText("#tab-save", t("tabSave")); setText("#tab-shopee", t("tabShopee")); setText("#tab-order", C.ORDERS_OPEN ? t("tabOrder") : t("tabOrderSoon"));
     $("#orderSoon").hidden = !!C.ORDERS_OPEN;
@@ -264,6 +351,10 @@
     $("#matOpts").innerHTML = D.materials.map(function (o) { return radio("material", o, "mat"); }).join("");
     $("#handleOpts").innerHTML = D.handles.map(function (o) { return radio("handle", o, "handle"); }).join("");
     $("#lineOpts").innerHTML = D.lines.map(function (o) { return radio("strType", o, "line"); }).join("");
+    $("#catOpts").innerHTML = D.cats.map(function (o) {
+      return '<label class="opt"><input type="radio" name="cat" value="' + o.id + '"><span class="optText"><b>' + esc(nm(o)) +
+        "</b><small>" + esc(t("catBody", { b: o.body })) + "</small></span></label>";
+    }).join("");
     $("#toyGrid").innerHTML = D.toys.map(function (o) {
       return '<div class="toy" data-toy="' + o.id + '"><svg viewBox="-26 -2 52 54" aria-hidden="true">' + TOY[o.id] + "</svg>" +
         "<b>" + esc(nm(o)) + '</b><small data-w="toy:' + o.id + '"></small>' +
@@ -290,7 +381,10 @@
     if (+sr.value !== state.strLen) sr.value = state.strLen;
     setText("#lenOut", state.length + " " + t("cm"));
     setText("#lineOut", state.strLen + " " + t("cm"));
-    [["material", state.material], ["handle", state.handle], ["strType", state.strType]].forEach(function (p) {
+    var pr = $("#personRange");
+    if (+pr.value !== state.person) pr.value = state.person;
+    setText("#personOut", state.person + " " + t("cm"));
+    [["material", state.material], ["handle", state.handle], ["strType", state.strType], ["cat", state.cat]].forEach(function (p) {
       var inputs = document.querySelectorAll('input[name="' + p[0] + '"]');
       for (i = 0; i < inputs.length; i++) inputs[i].checked = inputs[i].value === p[1];
     });
@@ -317,6 +411,7 @@
     setText("#headline", t("headline", { mat: nm(c.m), len: state.length }));
     setText("#specLine", t("spec", { total: fmt(c.total), tip: fmt(c.tip) }));
     renderStage(c, !!doSwing);
+    renderScale(c);
 
     // gauges
     var tipLv = c.ratio > 1 ? "bad" : c.ratio > 0.7 ? "warn" : "good";
@@ -463,6 +558,8 @@
       if (n === "material") state.material = e.target.value;
       else if (n === "handle") state.handle = e.target.value;
       else if (n === "strType") state.strType = e.target.value;
+      else if (n === "cat") state.cat = e.target.value;
+      else if (e.target.id === "personRange") state.person = snap(+e.target.value, D.person);
       else if (e.target.id === "lenRange") state.length = snap(+e.target.value, D.length);
       else if (e.target.id === "lineRange") state.strLen = snap(+e.target.value, D.line);
       else if (e.target.getAttribute && e.target.getAttribute("data-chk")) { checked[e.target.getAttribute("data-chk")] = e.target.checked; return; }
@@ -472,6 +569,7 @@
     panel.addEventListener("input", function (e) {
       if (e.target.id === "lenRange") { state.length = snap(+e.target.value, D.length); update(false); }
       else if (e.target.id === "lineRange") { state.strLen = snap(+e.target.value, D.line); update(false); }
+      else if (e.target.id === "personRange") { state.person = snap(+e.target.value, D.person); update(false); }
     });
 
     $("#toyGrid").addEventListener("click", function (e) {
@@ -485,6 +583,7 @@
     });
 
     $("#stage").addEventListener("click", wiggle);
+    $("#sizeFix").addEventListener("click", function () { state.length = sizeRange(state.person).mid; update(true); });
 
     // tabs
     var tabs = ["save", "shopee", "order"];
@@ -549,6 +648,8 @@
     var lr = $("#lenRange"), sr = $("#lineRange");
     lr.min = D.length.min; lr.max = D.length.max; lr.step = D.length.step;
     sr.min = D.line.min; sr.max = D.line.max; sr.step = D.line.step;
+    var pr = $("#personRange");
+    pr.min = D.person.min; pr.max = D.person.max; pr.step = D.person.step;
     buildStatic(); buildLists(); bind(); update(true);
   }
   init();

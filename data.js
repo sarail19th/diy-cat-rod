@@ -29,6 +29,15 @@ window.CATALOG = {
   length: { min: 30, max: 120, step: 5, def: 60 },
   line: { min: 20, max: 80, step: 5, def: 40 },
 
+  // Size guide. Person height range in cm. Cats: k scales a typical cat
+  // (about 40 cm chest to rump); body is that length in cm.
+  person: { min: 140, max: 190, step: 5, def: 160 },
+  cats: [
+    { id: "kitten", k: 0.55, body: 22, name: { th: "ลูกแมว", en: "Kitten" } },
+    { id: "adult", k: 1, body: 40, name: { th: "แมวทั่วไป", en: "Typical cat" } },
+    { id: "large", k: 1.3, body: 52, name: { th: "แมวตัวใหญ่", en: "Large cat" } }
+  ],
+
   // gpc = grams per cm. tipBase = grams of tip load the rod carries
   // at 60 cm before it droops; longer rods carry less.
   materials: [

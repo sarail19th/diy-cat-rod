@@ -4,6 +4,7 @@ A static website where cat owners design their own cat teaser wand. Pick rod len
 
 When the design is done, the visitor can:
 
+- **Compare size** with a to-scale picture of a person (140 to 190 cm) and a cat (kitten, typical, large) holding or chasing the wand, with a suggested rod length for the person's height.
 - **Save** it in their browser, or copy a link that reopens the same design.
 - **Buy the parts on Shopee** from a checklist of search links, plus 4 assembly steps.
 - **Order from the shop** (coming soon): the tab shows a "coming soon" note for now. The price estimate and order form are built and switched off. Set `ORDERS_OPEN: true` in `data.js` to show them.
@@ -41,6 +42,12 @@ Prices in `CATALOG` (`price`, `base`, `perCm`) are placeholders. Replace them wi
 - Each material carries a tip load before it droops (`tipBase`, at 60 cm). Longer rods carry proportionally less.
 - The rod drawing bends in proportion to tip load divided by that limit.
 - Total weight above `TOTAL_MAX` (70 g) is flagged as tiring for the wrist.
+
+## How the size guide works
+
+- The picture is drawn at 1 unit = 1 cm. The person is a simple figure scaled to the chosen height, the cat is a typical cat (about 40 cm chest to rump) scaled for kitten or large.
+- The suggested rod length is 25% to 50% of the person's height, rounded to 5 cm. This is a rough rule of thumb, not a standard. Change it in `sizeRange()` in `app.js`.
+- Cat sizes and the person height range are in `data.js` (`person`, `cats`).
 
 All numbers are estimates in `data.js` to help people decide. Adjust them after you weigh your real parts.
 
