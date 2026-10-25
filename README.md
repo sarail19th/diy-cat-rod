@@ -48,6 +48,12 @@ Toys can hang anywhere along the line, not only at the end. For rod flex the mod
 
 Sources: EHS Today and ILO Encyclopaedia (hand-tool ergonomics), Maddie's Fund (cat play).
 
+## Parts pictures and connectors
+
+The Shopee list shows a small drawn icon for each part. Shopee product photos cannot be fetched from here, so to use a real photo add an `img: "https://..."` field to that item in `data.js`; it replaces the drawing.
+
+Toys attach to the line with a connector you choose (knot, key ring, lobster clasp or swivel). Each connector weighs a little and is counted at the tip, along with a small screw eye (`tipFit`) on the rod tip that the line ties to.
+
 ## How the size guide works
 
 - The picture is drawn at 1 unit = 1 cm. The person is a simple figure scaled to the chosen height, the cat is a typical cat (about 40 cm chest to rump) scaled for kitten or large.

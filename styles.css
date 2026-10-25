@@ -330,3 +330,5 @@ button, input, textarea { font: inherit; color: inherit; }
 .itemPos { display: flex; justify-content: space-between; font-size: 13px; color: var(--ink-soft); }
 .itemPos output { font-weight: 600; color: var(--felt); }
 .endBtn { font: inherit; font-size: 13px; background: none; border: none; color: var(--felt); text-decoration: underline; cursor: pointer; min-height: 32px; padding: 0; }
+
+.parts .pico, .pico { flex: none; width: 44px; height: 44px; background: var(--felt); border-radius: 10px; object-fit: cover; }

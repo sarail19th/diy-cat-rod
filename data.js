@@ -128,10 +128,30 @@ window.CATALOG = {
       name: { th: "ลูกบอลกรอบแกรบ", en: "Crinkle ball" } }
   ],
 
+  // How toys attach to the line. g = grams per piece (one per toy). Used on the
+  // line wherever a toy hangs. tipFit is the small screw eye on the rod tip that
+  // the line ties to when you use rings or clips.
+  hooks: [
+    { id: "knot", g: 0, price: 0, kw: "",
+      name: { th: "ผูกเงื่อนหรือทากาว", en: "Knot or glue" },
+      feel: { th: "เบาที่สุด แต่เปลี่ยนของเล่นยาก", en: "Lightest, but hard to swap toys" } },
+    { id: "ring", g: 0.4, price: 3, kw: "แหวนพวงกุญแจ 15 มม. ห่วงกลม",
+      name: { th: "แหวนพวงกุญแจ", en: "Key ring (split ring)" },
+      feel: { th: "เบา ร้อยสายกับของเล่นได้ทุกจุด", en: "Light, joins line and toy anywhere" } },
+    { id: "clip", g: 1, price: 5, kw: "ตะขอก้ามปู พวงกุญแจ ตัวเล็ก",
+      name: { th: "ตะขอก้ามปู (ตะขอพวงกุญแจ)", en: "Lobster clasp (keychain hook)" },
+      feel: { th: "ถอดเปลี่ยนของเล่นเร็ว หนักกว่าแหวน", en: "Swap toys fast, heavier than a ring" } },
+    { id: "swivel", g: 0.5, price: 4, kw: "ลูกหมุนตกปลา เบอร์เล็ก ตะขอ",
+      name: { th: "ลูกหมุนมีตะขอ", en: "Swivel with clip" },
+      feel: { th: "ของเล่นหมุนได้ สายไม่พันกัน", en: "Toy spins, line does not twist" } }
+  ],
+  tipFit: { g: 0.4, price: 4, kw: "ห่วงเกลียว สกรูตาไก่ ตัวเล็ก",
+    name: { th: "ห่วงเกลียวติดปลายก้าน", en: "Screw eye for the rod tip" } },
+
   extras: [
     { id: "glue", kw: "กาวร้อน ปืนกาว",
       name: { th: "กาวร้อนและปืนกาว", en: "Hot glue and gun" } },
-    { id: "swivel", kw: "ลูกหมุนตกปลา เบอร์เล็ก",
-      name: { th: "ลูกหมุนตกปลาเบอร์เล็ก (เปลี่ยนของเล่นง่าย)", en: "Small fishing swivels (quick toy swaps)" } }
+    { id: "pliers", kw: "คีมปากจิ้งจก คีมหนีบ ปากแหลม",
+      name: { th: "คีมปากแหลม (ปิดห่วงและตะขอ)", en: "Needle-nose pliers (to close rings and hooks)" } }
   ]
 };

@@ -29,7 +29,7 @@
     return {
       length: D.length.def, material: "bamboo", rodD: 4,
       handle: "foam", hMode: "cover", handleLen: D.handleLen.def,
-      strLen: D.line.def, strType: "cotton",
+      strLen: D.line.def, strType: "cotton", hook: "ring",
       person: D.person.def, cat: "adult",
       items: [{ id: "fish", at: D.line.def }, { id: "ribbon", at: 22 }]
     };
@@ -39,7 +39,7 @@
     var items = s.items.map(function (it) { return it.id + "." + it.at; }).join(",");
     return new URLSearchParams({
       l: s.length, m: s.material, d: s.rodD, h: s.handle, hm: s.hMode, hl: s.handleLen,
-      sl: s.strLen, st: s.strType, ph: s.person, cs: s.cat, i: items
+      sl: s.strLen, st: s.strType, hk: s.hook, ph: s.person, cs: s.cat, i: items
     }).toString();
   }
 
@@ -56,6 +56,7 @@
     s.handleLen = snap(parseFloat(q.get("hl")) || D.handleLen.def, D.handleLen);
     s.strLen = snap(parseFloat(q.get("sl")) || D.line.def, D.line);
     if (find(D.lines, q.get("st"))) s.strType = q.get("st");
+    if (find(D.hooks, q.get("hk"))) s.hook = q.get("hk");
     s.person = snap(parseFloat(q.get("ph")) || D.person.def, D.person);
     if (find(D.cats, q.get("cs"))) s.cat = q.get("cs");
     s.items = [];
@@ -97,7 +98,7 @@
   function maxLenFor(EI, tipG) { var N = Math.max(tipG, 0.1) / 1000 * 9.81; return Math.sqrt(3 * EI * C.DEFLECT / N) * 100; }
 
   function calc(s) {
-    var m = find(D.materials, s.material), h = find(D.handles, s.handle), ln = find(D.lines, s.strType);
+    var m = find(D.materials, s.material), h = find(D.handles, s.handle), ln = find(D.lines, s.strType), hk = find(D.hooks, s.hook);
     var sp = rodSpec(m, s.rodD);
     // cover: the handle is a sleeve on the rod, so the rod is one piece and the sleeve adds no length.
     // joined: a separate handle is attached behind the rod and adds length (and a weak joint).
@@ -106,7 +107,8 @@
     var free = joined ? s.length : Math.max(s.length - s.handleLen, 10);   // rod in front of the grip
     var str = s.strLen * ln.gpcm, toys = 0;
     s.items.forEach(function (it) { toys += find(D.toys, it.id).g; });
-    var tip = str + toys, total = rod + hand + tip;
+    var hookG = hk.g ? hk.g * s.items.length + D.tipFit.g : 0;
+    var tip = str + toys + hookG, total = rod + hand + tip;
     var limit = flexLimit(sp.EI, free);
 
     // Torque about the middle of the handle with the wand held level. The handle itself
@@ -122,7 +124,7 @@
       }
     }
     return {
-      m: m, h: h, ln: ln, sp: sp, rod: rod, hand: hand, str: str, toys: toys, tip: tip, total: total,
+      m: m, h: h, ln: ln, hk: hk, hookG: hookG, sp: sp, rod: rod, hand: hand, str: str, toys: toys, tip: tip, total: total,
       limit: limit, ratio: tip / limit,
       lmax: Math.floor((maxLenFor(sp.EI, tip) + (joined ? 0 : s.length - free)) / D.length.step) * D.length.step,
       moment: moment, felt: moment / C.WRIST_ARM, balance: moment / total,
@@ -169,6 +171,10 @@
       var q = counts[toy.id] || 0;
       if (q) rows.push({ label: nm(toy) + " × " + q, v: toy.price * q });
     });
+    if (c.hk.g) {
+      rows.push({ label: nm(c.hk) + " × " + s.items.length, v: c.hk.price * s.items.length });
+      rows.push({ label: nm(D.tipFit), v: D.tipFit.price });
+    }
     rows.push({ label: t("assembly"), v: C.ASSEMBLY_FEE });
     rows.push({ label: t("shipping"), v: C.SHIPPING_FEE });
     var sum = rows.reduce(function (a, r) { return a + r.v; }, 0);
@@ -217,6 +223,48 @@
       out.push({ id: o.it.id, at: o.it.at, dx: dx });
     });
     return out;
+  }
+
+  /* ---------------- hardware drawings ---------------- */
+  var METAL = "#C9CED8", METAL_D = "#8D95A8";
+  // Small hook shape drawn on the line at (x, y). k scales it.
+  function hookMark(id, x, y, k) {
+    var g = '<g transform="translate(' + x + "," + y + ") scale(" + k + ')" fill="none" stroke="' + METAL + '" stroke-width="1.8" stroke-linecap="round">';
+    if (id === "ring") g += '<circle cx="0" cy="3" r="4"/>';
+    else if (id === "clip") g += '<circle cx="0" cy="-1" r="2.6"/><path d="M-3 2 h6 a3 3 0 0 1 0 6 h-6 a3 3 0 0 1 0 -6z" fill="' + METAL + '" stroke="' + METAL_D + '" stroke-width="1"/>';
+    else if (id === "swivel") g += '<circle cx="0" cy="-1" r="2.2"/><rect x="-1.6" y="1.5" width="3.2" height="5" rx="1.4" fill="' + METAL + '" stroke="' + METAL_D + '" stroke-width="1"/><circle cx="0" cy="9" r="2.2"/>';
+    return g + "</g>";
+  }
+
+  // Small picture for a part (same 52 x 54 box as the toy cards).
+  var ICON = {
+    rod: function (m) {
+      return '<line x1="-18" y1="46" x2="20" y2="6" stroke="' + m.color + '" stroke-width="' + (m.id === "wire" ? 2.4 : m.id === "tube" ? 7 : 4.5) + '" stroke-linecap="round"/>' +
+        (m.id === "tube" ? '<line x1="-18" y1="46" x2="20" y2="6" stroke="rgba(255,255,255,.7)" stroke-width="2" stroke-linecap="round"/>' : "") +
+        (m.node ? '<g stroke="#7B5A1C" stroke-width="2"><line x1="-3" y1="34" x2="1" y2="38"/><line x1="7" y1="23" x2="11" y2="27"/></g>' : "");
+    },
+    handle: function (h) {
+      return '<g transform="rotate(32 0 26)"><rect x="-8" y="3" width="16" height="46" rx="8" fill="' + h.color + '" stroke="rgba(255,255,255,.55)" stroke-width="1"/></g>';
+    },
+    line: function (ln) {
+      return '<path d="M-2 2 C-16 12 14 20 0 30 C-12 38 8 44 0 52" fill="none" stroke="' + ln.color + '" stroke-width="3" stroke-linecap="round"/>';
+    },
+    hook: function (id) { return hookMark(id, 0, 16, 2.6); },
+    tipfit: function () {
+      return '<g fill="none" stroke="' + METAL + '" stroke-width="3" stroke-linecap="round"><circle cx="0" cy="12" r="8"/><line x1="0" y1="20" x2="0" y2="48"/></g>' +
+        '<g stroke="' + METAL_D + '" stroke-width="1.5"><line x1="-4" y1="28" x2="4" y2="31"/><line x1="-4" y1="35" x2="4" y2="38"/><line x1="-4" y1="42" x2="4" y2="45"/></g>';
+    },
+    glue: function () {
+      return '<g stroke-linejoin="round"><path d="M-16 12 h22 v12 h-8 l-3 18 h-8 l2 -18 h-5z" fill="#F4B63F" stroke="#9A6E12"/><path d="M6 14 l10 5 v3 l-10 -1z" fill="#C9CED8" stroke="#8D95A8"/></g>';
+    },
+    pliers: function () {
+      return '<g stroke-linecap="round" fill="none"><path d="M-6 6 L2 28 M6 6 L-2 28" stroke="#C9CED8" stroke-width="3.5"/><path d="M2 28 L-14 50 M-2 28 L14 50" stroke="#E8547A" stroke-width="5"/></g>';
+    }
+  };
+  function iconSvg(kind, o, arg) {
+    if (o && o.img) return '<img class="pico" src="' + esc(o.img) + '" alt="">';
+    var inner = kind === "toy" ? TOY[arg] : ICON[kind](arg);
+    return '<svg class="pico" viewBox="-26 -2 52 54" aria-hidden="true">' + inner + "</svg>";
   }
 
   /* ---------------- handle decoration ---------------- */
@@ -326,11 +374,12 @@
     laid.forEach(function (o) {
       var py = o.at * 1.6, hy = py + 12;
       maxDx = Math.max(maxDx, Math.abs(o.dx));
-      svg += '<circle cx="0" cy="' + py.toFixed(1) + '" r="2.8" fill="' + c.ln.color + '"/>' +
+      svg += (c.hk.g ? hookMark(c.hk.id, 0, py.toFixed(1), 1.1) : '<circle cx="0" cy="' + py.toFixed(1) + '" r="2.8" fill="' + c.ln.color + '"/>') +
         '<line x1="0" y1="' + py.toFixed(1) + '" x2="' + o.dx + '" y2="' + hy.toFixed(1) + '" stroke="' + c.ln.color + '" stroke-width="1.6"/>' +
         '<g transform="translate(' + o.dx + "," + hy.toFixed(1) + ')">' + TOY[o.id] + "</g>";
     });
     svg += "</g></g>";
+    if (c.hk.g) svg += '<circle cx="' + tip.x.toFixed(1) + '" cy="' + tip.y.toFixed(1) + '" r="4" fill="none" stroke="' + METAL + '" stroke-width="1.8"/>';
 
     // line length marker
     var mxl = tip.x + maxDx + 52;
@@ -446,7 +495,7 @@
     setText("#gRodLabel", t("gRod"));
     setText("#gWristLabel", t("gWrist"));
     setText("#vRodL", t("chkRod") + " "); setText("#vWristL", t("chkWrist") + " "); setText("#vGripL", t("chkGrip") + " ");
-    ["s1", "s2", "s3", "s4", "s5", "lenLabel", "matLabel", "thickLabel", "lineLenLabel", "hModeLabel", "lineTypeLabel", "safety",
+    ["s1", "s2", "s3", "s4", "s5", "lenLabel", "matLabel", "thickLabel", "lineLenLabel", "hModeLabel", "hookLabel", "hookNote", "lineTypeLabel", "safety",
       "nameLabel", "myDesignsTitle", "shopeeIntro", "partsTitle", "suppliesTitle", "stepsTitle", "affiliateNote",
       "priceTitle", "priceNote", "foot", "sizeTitle", "sizeIntro", "personLabel", "catLabel", "hlLabel", "itemsTitle",
       "whySummary", "why1", "why2", "why3", "why5", "whySources"].forEach(function (k) {
@@ -492,6 +541,7 @@
         "</b><small>" + esc(t("hm_" + id + "_s")) + "</small></span></label>";
     }).join("");
     $("#lineOpts").innerHTML = D.lines.map(function (o) { return radio("strType", o, "line"); }).join("");
+    $("#hookOpts").innerHTML = D.hooks.map(function (o) { return radio("hook", o, "hook"); }).join("");
     $("#catOpts").innerHTML = D.cats.map(function (o) {
       return '<label class="opt"><input type="radio" name="cat" value="' + o.id + '"><span class="optText"><b>' + esc(nm(o)) +
         "</b><small>" + esc(t("catBody", { b: o.body, kg: o.kg })) + "</small></span></label>";
@@ -568,7 +618,7 @@
     setText("#lineOut", state.strLen + " " + t("cm"));
     setText("#hlOut", state.handleLen + " " + t("cm"));
     setText("#personOut", state.person + " " + t("cm"));
-    [["material", state.material], ["rodD", state.rodD], ["handle", state.handle], ["hMode", state.hMode], ["strType", state.strType], ["cat", state.cat]].forEach(function (p) {
+    [["material", state.material], ["rodD", state.rodD], ["handle", state.handle], ["hMode", state.hMode], ["strType", state.strType], ["hook", state.hook], ["cat", state.cat]].forEach(function (p) {
       var inputs = document.querySelectorAll('input[name="' + p[0] + '"]');
       for (i = 0; i < inputs.length; i++) inputs[i].checked = inputs[i].value === String(p[1]);
     });
@@ -583,6 +633,7 @@
         var hh = find(D.handles, id);
         txt = fmt((hh.bare ? 0 : hh.gpc) * state.handleLen) + " g";
       } else if (kind === "line") txt = t("weightAtLen", { w: fmt(state.strLen * find(D.lines, id).gpcm) });
+      else if (kind === "hook") { var hq = find(D.hooks, id); txt = hq.g ? fmt(hq.g) + " g / " + t("hookEach") : "0 g"; }
       else if (kind === "toy") txt = fmt(find(D.toys, id).g) + " g";
       ws[i].textContent = txt;
     }
@@ -635,23 +686,27 @@
   /* ---------------- finish panes ---------------- */
   function shopeeUrl(kw) { return C.SHOPEE_LINK_TEMPLATE.replace("{kw}", encodeURIComponent(kw)); }
 
-  function partRow(key, name, spec, kw) {
-    return '<li><input type="checkbox" data-chk="' + esc(key) + '"' + (checked[key] ? " checked" : "") + ' aria-label="' + esc(name) + '">' +
+  function partRow(key, name, spec, kw, icon) {
+    return '<li><input type="checkbox" data-chk="' + esc(key) + '"' + (checked[key] ? " checked" : "") + ' aria-label="' + esc(name) + '">' + (icon || "") +
       '<span class="pt">' + esc(name) + (spec ? "<small>" + esc(spec) + "</small>" : "") + "</span>" +
       '<a class="btn" href="' + esc(shopeeUrl(kw)) + '" target="_blank" rel="noopener sponsored">' + esc(t("searchShopee")) + "</a></li>";
   }
 
   function renderParts(c) {
     var rows = [], counts = countBy(state);
-    rows.push(partRow("rod-" + c.m.id + "-" + state.rodD, t("rodPart", { mat: nm(c.m), d: state.rodD }), t("cutTo", { len: state.length }), c.m.kw.split("{d}").join(state.rodD)));
-    if (!c.h.bare) rows.push(partRow("handle-" + c.h.id, t("handleLine", { handle: nm(c.h) }), t(c.joined ? "handlePartJoined" : "handlePartSpec", { len: state.handleLen }), c.h.kw));
-    rows.push(partRow("line-" + c.ln.id, nm(c.ln), t("lenOnly", { len: state.strLen }), c.ln.kw));
+    rows.push(partRow("rod-" + c.m.id + "-" + state.rodD, t("rodPart", { mat: nm(c.m), d: state.rodD }), t("cutTo", { len: state.length }), c.m.kw.split("{d}").join(state.rodD), iconSvg("rod", c.m, c.m)));
+    if (!c.h.bare) rows.push(partRow("handle-" + c.h.id, t("handleLine", { handle: nm(c.h) }), t(c.joined ? "handlePartJoined" : "handlePartSpec", { len: state.handleLen }), c.h.kw, iconSvg("handle", c.h, c.h)));
+    rows.push(partRow("line-" + c.ln.id, nm(c.ln), t("lenOnly", { len: state.strLen }), c.ln.kw, iconSvg("line", c.ln, c.ln)));
+    if (c.hk.g) {
+      rows.push(partRow("hook-" + c.hk.id, nm(c.hk), t("pieces", { q: c.n }) + " " + t("hookPerToy"), c.hk.kw, iconSvg("hook", c.hk, c.hk.id)));
+      rows.push(partRow("tipfit", nm(D.tipFit), t("tipFitSpec"), D.tipFit.kw, iconSvg("tipfit", D.tipFit)));
+    }
     D.toys.forEach(function (toy) {
       var q = counts[toy.id] || 0;
-      if (q) rows.push(partRow("toy-" + toy.id, nm(toy), t("pieces", { q: q }), toy.kw));
+      if (q) rows.push(partRow("toy-" + toy.id, nm(toy), t("pieces", { q: q }), toy.kw, iconSvg("toy", toy, toy.id)));
     });
     $("#partsList").innerHTML = rows.join("");
-    $("#suppliesList").innerHTML = D.extras.map(function (e) { return partRow("x-" + e.id, nm(e), "", e.kw); }).join("");
+    $("#suppliesList").innerHTML = D.extras.map(function (e) { return partRow("x-" + e.id, nm(e), "", e.kw, iconSvg(e.id, e)); }).join("");
     $("#assembleList").innerHTML = ["as1", "as2", "as3", "as4"].map(function (k) { return "<li>" + esc(t(k, { len: state.length })) + "</li>"; }).join("");
   }
 
@@ -708,6 +763,7 @@
     var L = [t("orderHead"), "",
       t("oSpec") + ": " + t("headline", { mat: nm(c.m), len: state.length }) + ", " + state.rodD + " " + t("mm"),
       t("handleLine", { handle: nm(c.h) }) + " " + state.handleLen + " " + t("cm") + (c.h.bare ? "" : " (" + t(c.joined ? "hm_joined" : "hm_cover") + ")") + ", " + t("lineLine", { line: nm(c.ln), len: state.strLen }),
+      t("hookLabel") + ": " + nm(c.hk),
       t("oItems") + ": " + (items.length ? items.join("; ") : t("oNone")),
       t("spec", { total: fmt(c.total), bal: fmt(c.balance) }),
       t("oTotal") + ": " + p.total + " " + t("baht"), "",
@@ -741,6 +797,7 @@
     else if (n === "handle") state.handle = el.value;
     else if (n === "hMode") state.hMode = el.value;
     else if (n === "strType") state.strType = el.value;
+    else if (n === "hook") state.hook = el.value;
     else if (n === "cat") state.cat = el.value;
     else if (el.id === "lenRange") state.length = snap(+el.value, D.length);
     else if (el.id === "lineRange") setStrLen(snap(+el.value, D.line));
