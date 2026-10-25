@@ -156,7 +156,6 @@ button, input, textarea { font: inherit; color: inherit; }
 .gauge[data-level="warn"] .fill { background: var(--warn); }
 .gauge[data-level="bad"] .fill { background: var(--bad); }
 .limitMark { position: absolute; top: 0; bottom: 0; width: 3px; background: var(--ink); left: calc(100% / 1.3 - 1px); }
-#gTotalMark { left: 70%; }
 .gNote { font-size: 13px; color: var(--ink-soft); }
 
 .verdict {
@@ -306,3 +305,28 @@ button, input, textarea { font: inherit; color: inherit; }
   .swing.go { animation: none; }
   .fill, .toast, .opt { transition: none; }
 }
+
+/* ---------- wrist / grip checks, rod thickness, toy positions ---------- */
+.limitMark--soft { background: var(--ink-soft); opacity: .55; width: 2px; }
+.checks { display: grid; gap: 8px; }
+.verdict b { font-weight: 600; margin-right: 4px; }
+.verdict b:empty { display: none; }
+.why { font-size: 14px; color: var(--ink-soft); }
+.why summary { cursor: pointer; font-weight: 500; color: var(--ink); min-height: 32px; }
+.why ul { margin: 6px 0; padding-left: 20px; display: grid; gap: 6px; }
+.why .fine { margin-top: 8px; }
+.opts--sizes { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); margin-top: 0; }
+.opts--sizes .opt { justify-content: center; text-align: center; }
+.subhead { font-size: 16px; margin: 16px 0 8px; }
+.itemList { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.itemList .empty { color: var(--ink-soft); font-size: 14px; padding: 10px 12px; border: 1.5px dashed var(--line); border-radius: 12px; }
+.itemRow { display: flex; gap: 12px; border: 1.5px solid var(--line); border-radius: 12px; padding: 10px 12px; background: #fff; }
+.itemRow .ico { flex: none; width: 44px; height: 44px; background: var(--felt); border-radius: 10px; }
+.itemMain { flex: 1; min-width: 0; }
+.itemHead { display: flex; align-items: baseline; gap: 8px; }
+.itemHead small { color: var(--ink-soft); font-size: 12px; }
+.itemHead .rm { margin-left: auto; width: 36px; height: 36px; border-radius: 50%; border: 1.5px solid var(--ink); background: #fff; font-size: 20px; line-height: 1; cursor: pointer; padding: 0; }
+.itemHead .rm:hover { background: var(--ink); color: #fff; }
+.itemPos { display: flex; justify-content: space-between; font-size: 13px; color: var(--ink-soft); }
+.itemPos output { font-weight: 600; color: var(--felt); }
+.endBtn { font: inherit; font-size: 13px; background: none; border: none; color: var(--felt); text-decoration: underline; cursor: pointer; min-height: 32px; padding: 0; }

@@ -13,6 +13,7 @@
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
   function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* storage unavailable */ } }
+  function setText(id, s) { $(id).textContent = s; }
 
   var lang = lsGet("catwand.lang") === "en" ? "en" : "th";
   function t(key, vars) {
@@ -23,14 +24,23 @@
   function nm(o) { return o.name[lang]; }
 
   /* ---------------- state ---------------- */
+  // items: toys on the line. at = cm from the rod tip along the line (strLen = end of line).
   function defaults() {
-    return { length: D.length.def, material: "bamboo", handle: "foam", strLen: D.line.def, strType: "cotton", person: D.person.def, cat: "adult", items: { fish: 1, ribbon: 1 } };
+    return {
+      length: D.length.def, material: "bamboo", rodD: 4,
+      handle: "foam", handleLen: D.handleLen.def,
+      strLen: D.line.def, strType: "cotton",
+      person: D.person.def, cat: "adult",
+      items: [{ id: "fish", at: D.line.def }, { id: "ribbon", at: 22 }]
+    };
   }
 
   function serialize(s) {
-    var items = Object.keys(s.items).filter(function (k) { return s.items[k] > 0; })
-      .map(function (k) { return k + ":" + s.items[k]; }).join(",");
-    return new URLSearchParams({ l: s.length, m: s.material, h: s.handle, sl: s.strLen, st: s.strType, ph: s.person, cs: s.cat, i: items }).toString();
+    var items = s.items.map(function (it) { return it.id + "." + it.at; }).join(",");
+    return new URLSearchParams({
+      l: s.length, m: s.material, d: s.rodD, h: s.handle, hl: s.handleLen,
+      sl: s.strLen, st: s.strType, ph: s.person, cs: s.cat, i: items
+    }).toString();
   }
 
   function parse(qs) {
@@ -39,48 +49,125 @@
     var s = defaults();
     s.length = snap(parseFloat(q.get("l")) || D.length.def, D.length);
     if (find(D.materials, q.get("m"))) s.material = q.get("m");
+    var m = find(D.materials, s.material), d = parseFloat(q.get("d"));
+    s.rodD = m.sizes.indexOf(d) >= 0 ? d : m.dDef;
     if (find(D.handles, q.get("h"))) s.handle = q.get("h");
+    s.handleLen = snap(parseFloat(q.get("hl")) || D.handleLen.def, D.handleLen);
     s.strLen = snap(parseFloat(q.get("sl")) || D.line.def, D.line);
     if (find(D.lines, q.get("st"))) s.strType = q.get("st");
     s.person = snap(parseFloat(q.get("ph")) || D.person.def, D.person);
     if (find(D.cats, q.get("cs"))) s.cat = q.get("cs");
-    s.items = {};
+    s.items = [];
     var left = C.MAX_ATTACH;
-    (q.get("i") || "").split(",").forEach(function (pair) {
-      var p = pair.split(":"), n = Math.floor(parseFloat(p[1]));
-      if (find(D.toys, p[0]) && n > 0 && left > 0) { var use = Math.min(n, left); s.items[p[0]] = use; left -= use; }
+    (q.get("i") || "").split(",").forEach(function (tok) {
+      var id, at, n = 1, p;
+      if (!tok || left <= 0) return;
+      if (tok.indexOf(".") > 0) { p = tok.split("."); id = p[0]; at = parseFloat(p[1]); }
+      else if (tok.indexOf(":") > 0) { p = tok.split(":"); id = p[0]; n = Math.floor(parseFloat(p[1])); at = s.strLen; } // older links
+      else return;
+      if (!find(D.toys, id)) return;
+      for (var k = 0; k < n && left > 0; k++) {
+        s.items.push({ id: id, at: clamp(Math.round(isNaN(at) ? s.strLen : at), 0, s.strLen) });
+        left--;
+      }
     });
     return s;
   }
 
   var state = parse(location.search) || defaults();
 
-  function count(s) { return Object.keys(s.items).reduce(function (a, k) { return a + (s.items[k] || 0); }, 0); }
+  function setStrLen(v) {
+    var old = state.strLen;
+    state.strLen = v;
+    state.items.forEach(function (it) { it.at = it.at >= old ? v : Math.min(it.at, v); });
+  }
+
+  /* ---------------- physics ---------------- */
+  // Weight per cm and stiffness of a rod from its real size and typical material values.
+  function rodSpec(m, d) {
+    var inner = m.wall ? Math.max(0, d - 2 * m.wall) : 0;
+    var area = Math.PI / 4 * (d * d - inner * inner) / 100;                         // cm2
+    var I2 = Math.PI * (Math.pow(d, 4) - Math.pow(inner, 4)) / 64 * 1e-12;        // m4
+    return { gpc: area * m.rho, EI: m.E * 1e9 * I2 };                               // g per cm, N m2
+  }
+  // Tip load (g) a rod carries before its tip droops DEFLECT of its length (cantilever beam).
+  function flexLimit(EI, Lcm) { var Lm = Lcm / 100; return 3 * EI * C.DEFLECT / (Lm * Lm) / 9.81 * 1000; }
+  // Longest rod (cm) that carries tipG grams to the same droop.
+  function maxLenFor(EI, tipG) { var N = Math.max(tipG, 0.1) / 1000 * 9.81; return Math.sqrt(3 * EI * C.DEFLECT / N) * 100; }
 
   function calc(s) {
     var m = find(D.materials, s.material), h = find(D.handles, s.handle), ln = find(D.lines, s.strType);
-    var rod = s.length * m.gpc, str = s.strLen * ln.gpcm, toys = 0;
-    Object.keys(s.items).forEach(function (k) { toys += find(D.toys, k).g * s.items[k]; });
-    var tip = str + toys;
-    var limit = m.tipBase * 60 / s.length;
-    var lmax = Math.floor(m.tipBase * 60 / Math.max(tip, 0.1) / D.length.step) * D.length.step;
-    return { m: m, h: h, ln: ln, rod: rod, str: str, toys: toys, tip: tip, limit: limit, ratio: tip / limit,
-      lmax: lmax, total: rod + h.g + tip, n: count(s) };
+    var sp = rodSpec(m, s.rodD);
+    var rod = s.length * sp.gpc, hand = (h.bare ? sp.gpc : h.gpc) * s.handleLen;
+    var str = s.strLen * ln.gpcm, toys = 0;
+    s.items.forEach(function (it) { toys += find(D.toys, it.id).g; });
+    var tip = str + toys, total = rod + hand + tip;
+    var limit = flexLimit(sp.EI, s.length);
+
+    // Torque about the middle of the handle with the wand held level. The handle itself
+    // is centred on the grip so it adds weight but no torque.
+    var g2b = s.handleLen / 2;
+    var moment = rod * (g2b + s.length / 2) + tip * (g2b + s.length);       // g cm
+
+    var thick = null;
+    if (tip / limit > 1) {
+      for (var i = 0; i < m.sizes.length; i++) {
+        if (m.sizes[i] > s.rodD && flexLimit(rodSpec(m, m.sizes[i]).EI, s.length) * 0.7 >= tip) { thick = m.sizes[i]; break; }
+      }
+    }
+    return {
+      m: m, h: h, ln: ln, sp: sp, rod: rod, hand: hand, str: str, toys: toys, tip: tip, total: total,
+      limit: limit, ratio: tip / limit,
+      lmax: Math.floor(maxLenFor(sp.EI, tip) / D.length.step) * D.length.step,
+      moment: moment, felt: moment / C.WRIST_ARM, balance: moment / total,
+      gripD: h.bare ? s.rodD : h.d, n: s.items.length, thick: thick
+    };
+  }
+
+  function evaluate(c) {
+    var rod, wrist, grip, msgs = [], gl = "good", key;
+    if (c.ratio > 1) {
+      key = c.lmax < D.length.min ? "vRodBadShort" : (c.thick ? "vRodBadThick" : "vRodBad");
+      rod = { lv: "bad", text: t(key, { tip: fmt(c.tip), lmax: c.lmax, d: c.thick }) };
+    } else if (c.ratio > 0.7) rod = { lv: "warn", text: t("vRodWarn") };
+    else rod = { lv: "good", text: t("vRodGood") };
+
+    var wl = c.felt > C.WRIST_MAX ? "bad" : c.felt > C.WRIST_GOOD ? "warn" : "good";
+    wrist = { lv: wl, text: t({ good: "vWristGood", warn: "vWristWarn", bad: "vWristBad" }[wl], { felt: fmt(c.felt), arm: C.WRIST_ARM }) };
+
+    var gd = c.gripD, hl = state.handleLen;
+    if (gd < 10) { gl = "bad"; msgs.push(t("gripPinch", { d: fmt(gd) })); }
+    else if (gd < 25) { gl = "warn"; msgs.push(t("gripThin", { d: fmt(gd) })); }
+    if (hl < 10) { gl = "bad"; msgs.push(t("gripShort", { len: hl })); }
+    else if (hl < 12) { if (gl === "good") gl = "warn"; msgs.push(t("gripShortWarn", { len: hl })); }
+    if (c.h.slick) { if (gl === "good") gl = "warn"; msgs.push(t("gripSlick")); }
+    grip = { lv: gl, text: msgs.length ? msgs.join(" ") : t("gripGood", { d: fmt(gd), len: hl }) };
+
+    var order = { good: 0, warn: 1, bad: 2 };
+    var worst = [rod, wrist, grip].reduce(function (a, x) { return order[x.lv] > order[a] ? x.lv : a; }, "good");
+    return { rod: rod, wrist: wrist, grip: grip, worst: worst };
   }
 
   function prices(s) {
-    var c = calc(s), rows = [];
+    var c = calc(s), rows = [], counts = {};
     rows.push({ label: t("rodLine", { mat: nm(c.m), len: s.length }), v: Math.round(c.m.base + c.m.perCm * s.length) });
-    rows.push({ label: t("handleLine", { handle: nm(c.h) }), v: c.h.price });
+    if (!c.h.bare) rows.push({ label: t("handleLine", { handle: nm(c.h) }), v: c.h.price });
     rows.push({ label: t("lineLine", { line: nm(c.ln), len: s.strLen }), v: Math.round(c.ln.perCm * s.strLen) });
+    s.items.forEach(function (it) { counts[it.id] = (counts[it.id] || 0) + 1; });
     D.toys.forEach(function (toy) {
-      var q = s.items[toy.id] || 0;
+      var q = counts[toy.id] || 0;
       if (q) rows.push({ label: nm(toy) + " × " + q, v: toy.price * q });
     });
     rows.push({ label: t("assembly"), v: C.ASSEMBLY_FEE });
     rows.push({ label: t("shipping"), v: C.SHIPPING_FEE });
     var sum = rows.reduce(function (a, r) { return a + r.v; }, 0);
     return { rows: rows, total: sum };
+  }
+
+  function countBy(s) {
+    var counts = {};
+    s.items.forEach(function (it) { counts[it.id] = (counts[it.id] || 0) + 1; });
+    return counts;
   }
 
   /* ---------------- toy drawings (top of each toy at 0,0, hangs down) ---------------- */
@@ -104,20 +191,41 @@
     crinkle: '<circle cx="0" cy="11" r="10" fill="#D6DCE5" stroke="#98A2B8" stroke-width="1"/><path d="M-7 6 L1 10 L-5 16 M3 4 L6 12 L1 17" fill="none" stroke="#98A2B8" stroke-width="1.2"/><ellipse cx="-3.5" cy="6" rx="3" ry="2" fill="#fff" opacity=".7"/>'
   };
 
+  // Where toys hang. Toys at the same spot on the line fan out sideways; toys partway
+  // along the line hang a little to the side so the line stays visible.
+  function layoutItems(items, spacing, baseOff, strLen) {
+    var order = items.map(function (it, i) { return { it: it, i: i }; })
+      .sort(function (a, b) { return a.it.at - b.it.at || a.i - b.i; });
+    var placed = [], out = [];
+    order.forEach(function (o) {
+      var near = 0, dx;
+      placed.forEach(function (p) { if (Math.abs(p - o.it.at) < 9) near++; });
+      if (near === 0) dx = o.it.at < strLen ? baseOff : 0;
+      else dx = (near % 2 ? -1 : 1) * Math.ceil(near / 2) * spacing;
+      placed.push(o.it.at);
+      out.push({ id: o.it.id, at: o.it.at, dx: dx });
+    });
+    return out;
+  }
+
   /* ---------------- handle decoration ---------------- */
-  var HPX = 100;
-  function handleDecor(id, w) {
-    var o = "", i, h = w / 2;
+  function handleDecor(id, w, hpx) {
+    var o = "", i, h = w / 2, step;
     if (id === "foam") {
-      for (i = 1; i < 7; i++) o += '<line x1="' + (-HPX + i * 14) + '" y1="' + -h + '" x2="' + (-HPX + i * 14) + '" y2="' + h + '" stroke="rgba(255,255,255,.4)" stroke-width="1.5"/>';
+      for (i = 1; i < 7; i++) o += '<line x1="' + (-hpx + i * hpx / 7).toFixed(1) + '" y1="' + -h + '" x2="' + (-hpx + i * hpx / 7).toFixed(1) + '" y2="' + h + '" stroke="rgba(255,255,255,.4)" stroke-width="1.5"/>';
     } else if (id === "cork") {
-      for (i = 0; i < 30; i++) o += '<circle cx="' + (-96 + (i * 53) % 100) + '" cy="' + (((i * 29) % Math.max(w - 6, 1)) - h + 3) + '" r="' + (1 + (i % 3) * 0.5) + '" fill="rgba(110,70,30,.55)"/>';
+      for (i = 0; i < 30; i++) o += '<circle cx="' + (-hpx + 4 + (i * 53) % (hpx - 8)) + '" cy="' + (((i * 29) % Math.max(w - 6, 1)) - h + 3) + '" r="' + (1 + (i % 3) * 0.5) + '" fill="rgba(110,70,30,.55)"/>';
     } else if (id === "wood") {
-      for (i = 1; i < 9; i++) o += '<line x1="' + (-HPX + i * 11) + '" y1="' + -h + '" x2="' + (-HPX + i * 11) + '" y2="' + h + '" stroke="rgba(60,30,10,.4)" stroke-width="1.5"/>';
+      for (i = 1; i < 9; i++) o += '<line x1="' + (-hpx + i * hpx / 9).toFixed(1) + '" y1="' + -h + '" x2="' + (-hpx + i * hpx / 9).toFixed(1) + '" y2="' + h + '" stroke="rgba(60,30,10,.4)" stroke-width="1.5"/>';
     } else if (id === "tape") {
-      for (i = 0; i < 18; i++) o += '<path d="M' + (-110 + i * 9) + ' ' + h + ' L' + (-110 + i * 9 + w) + ' ' + -h + '" stroke="rgba(255,255,255,.4)" stroke-width="2"/>';
+      for (i = 0; i < 20; i++) o += '<path d="M' + (-hpx - 10 + i * 9) + ' ' + h + ' L' + (-hpx - 10 + i * 9 + w) + ' ' + -h + '" stroke="rgba(255,255,255,.4)" stroke-width="2"/>';
     } else if (id === "cord") {
-      for (i = 0; i < 22; i++) o += '<path d="M' + (-110 + i * 8) + ' ' + h + ' L' + (-110 + i * 8 + 8) + ' ' + -h + ' M' + (-110 + i * 8) + ' ' + -h + ' L' + (-110 + i * 8 + 8) + ' ' + h + '" stroke="rgba(27,35,71,.35)" stroke-width="1.5" fill="none"/>';
+      step = 8;
+      for (i = 0; i < 18; i++) o += '<path d="M' + (-hpx - 10 + i * step) + ' ' + h + ' L' + (-hpx - 10 + i * step + step) + ' ' + -h + ' M' + (-hpx - 10 + i * step) + ' ' + -h + ' L' + (-hpx - 10 + i * step + step) + ' ' + h + '" stroke="rgba(27,35,71,.35)" stroke-width="1.5" fill="none"/>';
+    } else if (id === "silicone") {
+      for (i = 1; i < 12; i++) o += '<line x1="' + (-hpx + i * hpx / 12).toFixed(1) + '" y1="' + -h + '" x2="' + (-hpx + i * hpx / 12).toFixed(1) + '" y2="' + h + '" stroke="rgba(255,255,255,.35)" stroke-width="1.2"/>';
+    } else if (id === "plastic") {
+      o += '<line x1="' + -hpx + '" y1="' + (-h * 0.35).toFixed(1) + '" x2="8" y2="' + (-h * 0.35).toFixed(1) + '" stroke="rgba(255,255,255,.85)" stroke-width="2"/>';
     }
     return o;
   }
@@ -141,7 +249,7 @@
   }
 
   function renderStage(c, doSwing) {
-    var L = state.length, X0 = 120, Y0 = 295, base = -26 * Math.PI / 180;
+    var L = state.length, X0 = 130, Y0 = 295, base = -26 * Math.PI / 180;
     var rodPx = 130 + (L - 30) * 3.3;
     var bend = Math.min(1.05, 0.05 + 0.62 * Math.min(c.ratio, 1.6));
     var N = 28, seg = rodPx / N, pts = [{ x: X0, y: Y0, a: base }], x = X0, y = Y0, a, i;
@@ -160,7 +268,7 @@
     var svg = "";
 
     // length ruler above the rod (straight baseline)
-    var dx = Math.cos(base), dy = Math.sin(base), nx0 = dy, ny0 = -dx; // points up-left of the rod
+    var dx = Math.cos(base), dy = Math.sin(base), nx0 = dy, ny0 = -dx;
     var off = 40, rs = { x: X0 + nx0 * off, y: Y0 + ny0 * off }, re = { x: rs.x + dx * rodPx, y: rs.y + dy * rodPx };
     var tk = 6;
     svg += '<g stroke="rgba(255,255,255,.7)" stroke-width="1.5" fill="none">' +
@@ -185,30 +293,32 @@
       }).join(" ") + '"/>';
     }
 
-    // handle
-    var hw2 = c.h.w;
+    // handle (length follows the slider, up to what fits on screen)
+    var HPX = clamp(100 * state.handleLen / 14, 56, 112);
+    var hw2 = c.h.bare ? 9 : clamp(8 + c.gripD * 0.55, 11, 26), hcol = c.h.bare ? c.m.color : c.h.color;
     svg += '<g transform="translate(' + X0 + "," + Y0 + ') rotate(-26)">' +
       '<clipPath id="hclip"><rect x="' + -HPX + '" y="' + -hw2 / 2 + '" width="' + (HPX + 8) + '" height="' + hw2 + '" rx="' + hw2 / 2 + '"/></clipPath>' +
-      '<rect x="' + -HPX + '" y="' + -hw2 / 2 + '" width="' + (HPX + 8) + '" height="' + hw2 + '" rx="' + hw2 / 2 + '" fill="' + c.h.color + '"/>' +
-      '<g clip-path="url(#hclip)">' + handleDecor(c.h.id, hw2) + "</g>" +
+      '<rect x="' + -HPX + '" y="' + -hw2 / 2 + '" width="' + (HPX + 8) + '" height="' + hw2 + '" rx="' + hw2 / 2 + '" fill="' + hcol + '"/>' +
+      '<g clip-path="url(#hclip)">' + handleDecor(c.h.id, hw2, HPX) + "</g>" +
       '<rect x="' + -HPX + '" y="' + -hw2 / 2 + '" width="' + (HPX + 8) + '" height="' + hw2 + '" rx="' + hw2 / 2 + '" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.2"/></g>';
 
-    // line + toys
-    var tip = pts[N], spx = state.strLen * 1.6, list = [];
-    D.toys.forEach(function (toy) { for (var q = 0; q < (state.items[toy.id] || 0); q++) list.push(toy.id); });
-    var n = list.length;
+    // line and toys at their positions along it
+    var tip = pts[N], spx = state.strLen * 1.6;
+    var laid = layoutItems(state.items, 34, 16, state.strLen), maxDx = 0;
     svg += '<g transform="translate(' + tip.x.toFixed(1) + "," + tip.y.toFixed(1) + ')"><g class="swing' + (doSwing ? " go" : "") + '" id="swing">' +
-      '<line x1="0" y1="0" x2="0" y2="' + spx + '" stroke="' + c.ln.color + '" stroke-width="2.2" stroke-linecap="round"/>' +
-      '<circle cx="0" cy="' + spx + '" r="3.2" fill="' + c.ln.color + '"/>';
-    list.forEach(function (id, k) {
-      var px = (k - (n - 1) / 2) * 36, py = 14 + Math.abs(px) * 0.18 + (k % 2) * 10;
-      svg += '<line x1="0" y1="' + spx + '" x2="' + px.toFixed(1) + '" y2="' + (spx + py).toFixed(1) + '" stroke="' + c.ln.color + '" stroke-width="1.6"/>' +
-        '<g transform="translate(' + px.toFixed(1) + "," + (spx + py).toFixed(1) + ')">' + TOY[id] + "</g>";
+      '<line x1="0" y1="0" x2="0" y2="' + spx.toFixed(1) + '" stroke="' + c.ln.color + '" stroke-width="2.2" stroke-linecap="round"/>' +
+      '<circle cx="0" cy="' + spx.toFixed(1) + '" r="3.2" fill="' + c.ln.color + '"/>';
+    laid.forEach(function (o) {
+      var py = o.at * 1.6, hy = py + 12;
+      maxDx = Math.max(maxDx, Math.abs(o.dx));
+      svg += '<circle cx="0" cy="' + py.toFixed(1) + '" r="2.8" fill="' + c.ln.color + '"/>' +
+        '<line x1="0" y1="' + py.toFixed(1) + '" x2="' + o.dx + '" y2="' + hy.toFixed(1) + '" stroke="' + c.ln.color + '" stroke-width="1.6"/>' +
+        '<g transform="translate(' + o.dx + "," + hy.toFixed(1) + ')">' + TOY[o.id] + "</g>";
     });
     svg += "</g></g>";
 
     // line length marker
-    var mxl = tip.x + (n - 1) * 18 + 52;
+    var mxl = tip.x + maxDx + 52;
     svg += '<g stroke="rgba(255,255,255,.7)" stroke-width="1.5" fill="none"><line x1="' + mxl.toFixed(1) + '" y1="' + tip.y.toFixed(1) + '" x2="' + mxl.toFixed(1) + '" y2="' + (tip.y + spx).toFixed(1) + '" stroke-dasharray="5 5"/>' +
       '<line x1="' + (mxl - 6).toFixed(1) + '" y1="' + tip.y.toFixed(1) + '" x2="' + (mxl + 6).toFixed(1) + '" y2="' + tip.y.toFixed(1) + '"/>' +
       '<line x1="' + (mxl - 6).toFixed(1) + '" y1="' + (tip.y + spx).toFixed(1) + '" x2="' + (mxl + 6).toFixed(1) + '" y2="' + (tip.y + spx).toFixed(1) + '"/></g>' +
@@ -230,7 +340,8 @@
   var CAT_SVG = '<g fill="#0F6E6A"><ellipse cx="0" cy="-17" rx="20" ry="9"/><rect x="-17" y="-15" width="5.5" height="15" rx="2.7"/><rect x="-10" y="-15" width="5.5" height="15" rx="2.7"/><ellipse cx="13" cy="-12" rx="7.5" ry="8.5"/><rect x="9.5" y="-7" width="5.5" height="7" rx="2.7"/><rect x="15.5" y="-7" width="5.5" height="7" rx="2.7"/><circle cx="-24" cy="-28" r="8.5"/><path d="M-31 -31 L-30 -41 L-23.5 -35Z"/><path d="M-24.5 -35.5 L-18.5 -40 L-17.5 -31.5Z"/><path d="M19 -20 C30 -22 34 -34 28 -42" fill="none" stroke="#0F6E6A" stroke-width="4" stroke-linecap="round"/></g><circle cx="-28" cy="-29" r="1.4" fill="#fff"/>';
 
   function renderScale(c) {
-    var h = state.person, L = state.length, cat = find(D.cats, state.cat), k = cat.k, ink = "#1B2347", soft = "#4A5272", i, s = "";
+    var h = state.person, L = state.length, hl = state.handleLen, cat = find(D.cats, state.cat), k = cat.k;
+    var ink = "#1B2347", soft = "#4A5272", i, s = "";
     var font = 'style="font-family:var(--font-body)"';
 
     // floor and 50 cm grid
@@ -252,12 +363,13 @@
       '<line x1="' + (-0.14 * h).toFixed(1) + '" y1="' + (shY + 0.03 * h).toFixed(1) + '" x2="' + (-0.16 * h).toFixed(1) + '" y2="' + (-0.5 * h).toFixed(1) + '" stroke-width="' + (0.065 * h).toFixed(1) + '"/>' +
       '<polyline fill="none" stroke-width="' + (0.065 * h).toFixed(1) + '" points="' + (0.14 * h).toFixed(1) + "," + (shY + 0.03 * h).toFixed(1) + " " + (0.2 * h).toFixed(1) + "," + (-0.64 * h).toFixed(1) + " " + hx.toFixed(1) + "," + hy.toFixed(1) + '"/></g>';
 
-    // wand held at the hand: 15 cm handle behind, rod L cm ahead, 22 degrees up
+    // wand held at the hand: handle behind, rod L cm ahead, 22 degrees up
     var a = -22 * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a);
-    var bx = hx - 15 * ca, by = hy - 15 * sa, fx = hx + 3 * ca, fy = hy + 3 * sa;
+    var bx = hx - hl * ca, by = hy - hl * sa, fx = hx + 3 * ca, fy = hy + 3 * sa;
     var tx = hx + L * ca, ty = hy + L * sa;
-    s += '<line x1="' + bx.toFixed(1) + '" y1="' + by.toFixed(1) + '" x2="' + fx.toFixed(1) + '" y2="' + fy.toFixed(1) + '" stroke="rgba(27,35,71,.55)" stroke-width="4.6" stroke-linecap="round"/>' +
-      '<line x1="' + bx.toFixed(1) + '" y1="' + by.toFixed(1) + '" x2="' + fx.toFixed(1) + '" y2="' + fy.toFixed(1) + '" stroke="' + c.h.color + '" stroke-width="3.4" stroke-linecap="round"/>' +
+    var hw = Math.max(1.6, c.gripD / 10), hcol = c.h.bare ? c.m.color : c.h.color;
+    s += '<line x1="' + bx.toFixed(1) + '" y1="' + by.toFixed(1) + '" x2="' + fx.toFixed(1) + '" y2="' + fy.toFixed(1) + '" stroke="rgba(27,35,71,.55)" stroke-width="' + (hw + 1.2).toFixed(1) + '" stroke-linecap="round"/>' +
+      '<line x1="' + bx.toFixed(1) + '" y1="' + by.toFixed(1) + '" x2="' + fx.toFixed(1) + '" y2="' + fy.toFixed(1) + '" stroke="' + hcol + '" stroke-width="' + hw.toFixed(1) + '" stroke-linecap="round"/>' +
       '<line x1="' + fx.toFixed(1) + '" y1="' + fy.toFixed(1) + '" x2="' + tx.toFixed(1) + '" y2="' + ty.toFixed(1) + '" stroke="rgba(27,35,71,.55)" stroke-width="3" stroke-linecap="round"/>' +
       '<line x1="' + fx.toFixed(1) + '" y1="' + fy.toFixed(1) + '" x2="' + tx.toFixed(1) + '" y2="' + ty.toFixed(1) + '" stroke="' + c.m.color + '" stroke-width="2" stroke-linecap="round"/>';
 
@@ -271,14 +383,13 @@
       '<text x="' + mx.toFixed(1) + '" y="' + my.toFixed(1) + '" text-anchor="middle" transform="rotate(-22 ' + mx.toFixed(1) + " " + my.toFixed(1) + ')" font-size="9" font-weight="600" fill="' + ink + '" ' + font + ">" + esc(t("ruleRod", { len: L })) + "</text>";
 
     // line and toys at real size (the toy drawings are about 0.2 cm per unit)
-    var list = [];
-    D.toys.forEach(function (toy) { for (var q = 0; q < (state.items[toy.id] || 0); q++) list.push(toy.id); });
-    var n = list.length, ly = ty + state.strLen;
+    var ly = ty + state.strLen, laid = layoutItems(state.items, 7, 4, state.strLen);
     s += '<line x1="' + tx.toFixed(1) + '" y1="' + ty.toFixed(1) + '" x2="' + tx.toFixed(1) + '" y2="' + ly.toFixed(1) + '" stroke="' + soft + '" stroke-width=".9" stroke-linecap="round"/>';
-    list.forEach(function (id, j) {
-      var px = (j - (n - 1) / 2) * 7, py = 3 + Math.abs(px) * 0.18 + (j % 2) * 2;
-      s += '<line x1="' + tx.toFixed(1) + '" y1="' + ly.toFixed(1) + '" x2="' + (tx + px).toFixed(1) + '" y2="' + (ly + py).toFixed(1) + '" stroke="' + soft + '" stroke-width=".6"/>' +
-        '<g transform="translate(' + (tx + px).toFixed(1) + "," + (ly + py).toFixed(1) + ') scale(.2)">' + TOY[id] + "</g>";
+    laid.forEach(function (o) {
+      var py = ty + o.at, hy2 = py + 3;
+      s += '<circle cx="' + tx.toFixed(1) + '" cy="' + py.toFixed(1) + '" r=".9" fill="' + soft + '"/>' +
+        '<line x1="' + tx.toFixed(1) + '" y1="' + py.toFixed(1) + '" x2="' + (tx + o.dx).toFixed(1) + '" y2="' + hy2.toFixed(1) + '" stroke="' + soft + '" stroke-width=".6"/>' +
+        '<g transform="translate(' + (tx + o.dx).toFixed(1) + "," + hy2.toFixed(1) + ') scale(.2)">' + TOY[o.id] + "</g>";
     });
 
     // cat under the toy, facing the person
@@ -293,7 +404,6 @@
     el.innerHTML = s;
     el.setAttribute("aria-label", t("sizeSvg", { h: h, len: L, cat: nm(cat) }));
 
-    // guidance text
     var r = sizeRange(h), pct = Math.round(L / h * 100), x = fmt(L / cat.body);
     setText("#sizeSummary", t("sizeSummary", { len: L, pct: pct, x: x }));
     var key = L < r.lo ? "sizeShort" : L > r.hi ? "sizeLong" : "sizeFit";
@@ -301,13 +411,13 @@
     $("#sizeVerdict").setAttribute("data-level", key === "sizeFit" ? "good" : "warn");
     $("#sizeFix").hidden = key === "sizeFit";
     setText("#sizeFix", t("sizeFix", { mid: r.mid }));
+    setText("#sizeFine", t("sizeFine", { h: hl }));
   }
 
   /* ---------------- static + list building ---------------- */
   var checked = {};
   var picHidden = false;
-
-  function setText(id, s) { $(id).textContent = s; }
+  var thickSig = "", itemSig = "";
 
   function buildStatic() {
     document.documentElement.lang = lang;
@@ -317,18 +427,23 @@
     setText("#skip", t("skip"));
     setText("#tapHint", t("tapHint"));
     setText("#stageToggle", picHidden ? t("showPic") : t("hidePic"));
-    setText("#gTipLabel", t("gTip"));
-    setText("#gTotalLabel", t("gTotal"));
-    ["s1", "s2", "s3", "s4", "s5", "lenLabel", "matLabel", "lineLenLabel", "lineTypeLabel", "safety",
+    setText("#gRodLabel", t("gRod"));
+    setText("#gWristLabel", t("gWrist"));
+    setText("#vRodL", t("chkRod") + " "); setText("#vWristL", t("chkWrist") + " "); setText("#vGripL", t("chkGrip") + " ");
+    ["s1", "s2", "s3", "s4", "s5", "lenLabel", "matLabel", "thickLabel", "lineLenLabel", "lineTypeLabel", "safety",
       "nameLabel", "myDesignsTitle", "shopeeIntro", "partsTitle", "suppliesTitle", "stepsTitle", "affiliateNote",
-      "priceTitle", "priceNote", "foot", "sizeTitle", "sizeIntro", "personLabel", "catLabel", "sizeFine"].forEach(function (k) {
+      "priceTitle", "priceNote", "foot", "sizeTitle", "sizeIntro", "personLabel", "catLabel", "hlLabel", "itemsTitle",
+      "whySummary", "why1", "why2", "why3", "why5", "whySources"].forEach(function (k) {
       var el = $("#" + k);
       if (el) el.textContent = t(k === "affiliateNote" ? "affiliate" : k);
     });
+    setText("#why4", t("why4", { good: C.WRIST_GOOD, max: C.WRIST_MAX }));
     setText("#lenMin", D.length.min + " " + t("cm")); setText("#lenMax", D.length.max + " " + t("cm"));
+    setText("#hlMin", D.handleLen.min + " " + t("cm")); setText("#hlMax", D.handleLen.max + " " + t("cm"));
     setText("#personMin", D.person.min + " " + t("cm")); setText("#personMax", D.person.max + " " + t("cm"));
     setText("#lineMin", D.line.min + " " + t("cm")); setText("#lineMax", D.line.max + " " + t("cm"));
-    setText("#tab-save", t("tabSave")); setText("#tab-shopee", t("tabShopee")); setText("#tab-order", C.ORDERS_OPEN ? t("tabOrder") : t("tabOrderSoon"));
+    setText("#tab-save", t("tabSave")); setText("#tab-shopee", t("tabShopee"));
+    setText("#tab-order", C.ORDERS_OPEN ? t("tabOrder") : t("tabOrderSoon"));
     $("#orderSoon").hidden = !!C.ORDERS_OPEN;
     $("#orderLive").hidden = !C.ORDERS_OPEN;
     setText("#soonTitle", t("soonTitle")); setText("#soonText", t("soonText"));
@@ -343,15 +458,19 @@
     $("#affiliateNote").hidden = C.SHOPEE_LINK_TEMPLATE === DEFAULT_SHOPEE;
   }
 
-  function radio(name, o, extra) {
+  function radio(name, o, kind, small) {
+    if (small === undefined) small = o.feel ? o.feel[lang] : "";
     return '<label class="opt"><input type="radio" name="' + name + '" value="' + o.id + '">' + (o.color ? '<span class="swatch" style="background:' + o.color + '"></span>' : "") +
-      '<span class="optText"><b>' + esc(nm(o)) + "</b>" + (o.feel ? "<small>" + esc(o.feel[lang]) + "</small>" : "") + "</span>" +
-      '<span class="w" data-w="' + extra + ":" + o.id + '"></span></label>';
+      '<span class="optText"><b>' + esc(nm(o)) + "</b>" + (small ? "<small>" + esc(small) + "</small>" : "") + "</span>" +
+      '<span class="w" data-w="' + kind + ":" + o.id + '"></span></label>';
   }
 
   function buildLists() {
+    thickSig = ""; itemSig = "";
     $("#matOpts").innerHTML = D.materials.map(function (o) { return radio("material", o, "mat"); }).join("");
-    $("#handleOpts").innerHTML = D.handles.map(function (o) { return radio("handle", o, "handle"); }).join("");
+    $("#handleOpts").innerHTML = D.handles.map(function (o) {
+      return radio("handle", o, "handle", o.feel[lang] + (o.d ? " Ø " + o.d + " " + t("mm") : ""));
+    }).join("");
     $("#lineOpts").innerHTML = D.lines.map(function (o) { return radio("strType", o, "line"); }).join("");
     $("#catOpts").innerHTML = D.cats.map(function (o) {
       return '<label class="opt"><input type="radio" name="cat" value="' + o.id + '"><span class="optText"><b>' + esc(nm(o)) +
@@ -366,81 +485,122 @@
     }).join("");
   }
 
+  // Rod thickness options depend on the material, so they rebuild only when it changes.
+  function buildThick() {
+    var m = find(D.materials, state.material), sig = m.id + "|" + lang;
+    if (sig === thickSig) return;
+    thickSig = sig;
+    $("#thickOpts").innerHTML = m.sizes.map(function (d) {
+      return '<label class="opt opt--size"><input type="radio" name="rodD" value="' + d + '"><span class="optText"><b>' + esc(t("thickOpt", { d: d })) + "</b></span></label>";
+    }).join("");
+  }
+
+  // The list of toys on the line. Rebuilt only when the toys or line length change,
+  // so dragging a position slider is not interrupted.
+  function renderItems() {
+    var box = $("#itemList");
+    var sig = state.items.map(function (it) { return it.id; }).join(",") + "|" + state.strLen + "|" + lang;
+    if (sig !== itemSig) {
+      itemSig = sig;
+      if (!state.items.length) box.innerHTML = '<li class="empty">' + esc(t("noItems")) + "</li>";
+      else box.innerHTML = state.items.map(function (it, i) {
+        var toy = find(D.toys, it.id);
+        return '<li class="itemRow"><svg class="ico" viewBox="-26 -2 52 54" aria-hidden="true">' + TOY[it.id] + '</svg><div class="itemMain">' +
+          '<div class="itemHead"><b>' + esc(nm(toy)) + "</b><small>" + fmt(toy.g) + ' g</small><button type="button" class="rm" data-rm="' + i + '" aria-label="' + esc(t("removeItem", { name: nm(toy) })) + '"><span aria-hidden="true">×</span></button></div>' +
+          '<div class="itemPos"><label for="pos-' + i + '">' + esc(t("posLabel")) + '</label><output data-posout="' + i + '" for="pos-' + i + '"></output></div>' +
+          '<input id="pos-' + i + '" class="range" type="range" min="0" max="' + state.strLen + '" step="1" data-pos="' + i + '">' +
+          '<button type="button" class="endBtn" data-end="' + i + '">' + esc(t("endBtn")) + "</button></div></li>";
+      }).join("");
+    }
+    state.items.forEach(function (it, i) {
+      var r = box.querySelector('[data-pos="' + i + '"]'), o = box.querySelector('[data-posout="' + i + '"]'), eb = box.querySelector('[data-end="' + i + '"]');
+      if (r && +r.value !== it.at) r.value = it.at;
+      if (o) o.textContent = it.at >= state.strLen ? t("atEnd") : t("atFrom", { at: it.at });
+      if (eb) eb.hidden = it.at >= state.strLen;
+    });
+  }
+
   /* ---------------- update ---------------- */
-  function level(r, total) {
-    if (r > 1) return { lv: "bad", key: "vBad" };
-    if (total > C.TOTAL_MAX) return { lv: "bad", key: "vHeavy" };
-    if (r > 0.7) return { lv: "warn", key: "vWarn" };
-    return { lv: "good", key: "vGood" };
+  function setRange(sel, v) { var el = $(sel); if (+el.value !== v) el.value = v; }
+
+  function setGauge(id, lv, fillPct, valText, note, meterNow) {
+    $("#" + id).setAttribute("data-level", lv);
+    $("#" + id + "Fill").style.width = fillPct.toFixed(1) + "%";
+    setText("#" + id + "Val", valText);
+    setText("#" + id + "Note", note);
+    var tr = $("#" + id + "Track");
+    tr.setAttribute("aria-valuenow", Math.round(meterNow));
+    tr.setAttribute("aria-valuetext", valText);
+  }
+
+  function setCheck(id, o) {
+    $("#" + id).setAttribute("data-level", o.lv);
+    setText("#" + id + "T", o.text);
   }
 
   function update(doSwing) {
     var c = calc(state), i;
+    buildThick();
 
-    // controls
-    var lr = $("#lenRange"), sr = $("#lineRange");
-    if (+lr.value !== state.length) lr.value = state.length;
-    if (+sr.value !== state.strLen) sr.value = state.strLen;
+    setRange("#lenRange", state.length); setRange("#lineRange", state.strLen);
+    setRange("#hlRange", state.handleLen); setRange("#personRange", state.person);
     setText("#lenOut", state.length + " " + t("cm"));
     setText("#lineOut", state.strLen + " " + t("cm"));
-    var pr = $("#personRange");
-    if (+pr.value !== state.person) pr.value = state.person;
+    setText("#hlOut", state.handleLen + " " + t("cm"));
     setText("#personOut", state.person + " " + t("cm"));
-    [["material", state.material], ["handle", state.handle], ["strType", state.strType], ["cat", state.cat]].forEach(function (p) {
+    [["material", state.material], ["rodD", state.rodD], ["handle", state.handle], ["strType", state.strType], ["cat", state.cat]].forEach(function (p) {
       var inputs = document.querySelectorAll('input[name="' + p[0] + '"]');
-      for (i = 0; i < inputs.length; i++) inputs[i].checked = inputs[i].value === p[1];
+      for (i = 0; i < inputs.length; i++) inputs[i].checked = inputs[i].value === String(p[1]);
     });
+
     var ws = document.querySelectorAll("[data-w]");
     for (i = 0; i < ws.length; i++) {
-      var parts = ws[i].getAttribute("data-w").split(":"), kind = parts[0], id = parts[1], txt = "";
-      if (kind === "mat") txt = t("weightAtLen", { w: fmt(state.length * find(D.materials, id).gpc) });
-      else if (kind === "handle") txt = fmt(find(D.handles, id).g) + " g";
-      else if (kind === "line") txt = t("weightAtLen", { w: fmt(state.strLen * find(D.lines, id).gpcm) });
+      var parts = ws[i].getAttribute("data-w").split(":"), kind = parts[0], id = parts[1], txt = "", mm;
+      if (kind === "mat") {
+        mm = find(D.materials, id);
+        txt = t("weightAtLen", { w: fmt(state.length * rodSpec(mm, id === state.material ? state.rodD : mm.dDef).gpc) });
+      } else if (kind === "handle") {
+        var hh = find(D.handles, id);
+        txt = fmt((hh.bare ? c.sp.gpc : hh.gpc) * state.handleLen) + " g";
+      } else if (kind === "line") txt = t("weightAtLen", { w: fmt(state.strLen * find(D.lines, id).gpcm) });
       else if (kind === "toy") txt = fmt(find(D.toys, id).g) + " g";
       ws[i].textContent = txt;
     }
-    var full = c.n >= C.MAX_ATTACH;
+
+    var counts = countBy(state), full = c.n >= C.MAX_ATTACH;
     D.toys.forEach(function (toy) {
-      var q = state.items[toy.id] || 0, card = document.querySelector('[data-toy="' + toy.id + '"]');
+      var q = counts[toy.id] || 0, card = document.querySelector('[data-toy="' + toy.id + '"]');
       card.classList.toggle("has", q > 0);
       card.querySelector("[data-qty]").textContent = q;
       card.querySelector('[data-act="dec"]').disabled = q === 0;
       card.querySelector('[data-act="inc"]').disabled = full;
     });
     setText("#slots", full ? t("slotsFull", { max: C.MAX_ATTACH }) : t("slotsLeft", { n: C.MAX_ATTACH - c.n }));
+    renderItems();
 
-    // headline + stage
     setText("#headline", t("headline", { mat: nm(c.m), len: state.length }));
-    setText("#specLine", t("spec", { total: fmt(c.total), tip: fmt(c.tip) }));
+    setText("#specLine", t("spec", { total: fmt(c.total), bal: fmt(c.balance) }));
     renderStage(c, !!doSwing);
     renderScale(c);
 
     // gauges
-    var tipLv = c.ratio > 1 ? "bad" : c.ratio > 0.7 ? "warn" : "good";
-    var totLv = c.total > C.TOTAL_MAX ? "bad" : "good";
-    $("#gTip").setAttribute("data-level", tipLv);
-    $("#gTotal").setAttribute("data-level", totLv);
-    $("#gTipFill").style.width = (Math.min(c.ratio, 1.3) / 1.3 * 100).toFixed(1) + "%";
-    $("#gTotalFill").style.width = Math.min(c.total, 100).toFixed(1) + "%";
-    $("#gTotalMark").style.left = C.TOTAL_MAX + "%";
-    var tipVal = t("gTipVal", { tip: fmt(c.tip), limit: fmt(c.limit) });
-    setText("#gTipVal", tipVal);
-    setText("#gTipNote", t("gTipNote", { len: state.length, limit: fmt(c.limit) }));
-    setText("#gTotalVal", t("gTotalVal", { total: fmt(c.total) }));
-    setText("#gTotalNote", t("gTotalNote", { max: C.TOTAL_MAX }));
-    $("#gTipTrack").setAttribute("aria-valuenow", Math.round(c.ratio * 100));
-    $("#gTipTrack").setAttribute("aria-valuetext", tipVal);
-    $("#gTipTrack").setAttribute("aria-label", t("gTip"));
-    $("#gTotalTrack").setAttribute("aria-valuenow", Math.round(c.total));
-    $("#gTotalTrack").setAttribute("aria-valuetext", t("gTotalVal", { total: fmt(c.total) }));
-    $("#gTotalTrack").setAttribute("aria-label", t("gTotal"));
+    var rodLv = c.ratio > 1 ? "bad" : c.ratio > 0.7 ? "warn" : "good";
+    setGauge("gRod", rodLv, Math.min(c.ratio, 1.3) / 1.3 * 100,
+      t("gRodVal", { tip: fmt(c.tip), limit: fmt(c.limit) }),
+      t("gRodNote", { len: state.length, d: fmt(state.rodD), limit: fmt(c.limit) }), c.ratio * 100);
+    var wristScale = C.WRIST_MAX * 1.3;
+    var wLv = c.felt > C.WRIST_MAX ? "bad" : c.felt > C.WRIST_GOOD ? "warn" : "good";
+    setGauge("gWrist", wLv, Math.min(c.felt / wristScale, 1) * 100,
+      t("gWristVal", { felt: fmt(c.felt) }),
+      t("gWristNote", { arm: C.WRIST_ARM, total: fmt(c.total) }), c.felt);
+    $("#gWristMarkGood").style.left = (C.WRIST_GOOD / wristScale * 100).toFixed(1) + "%";
+    $("#gRodTrack").setAttribute("aria-label", t("gRod"));
+    $("#gWristTrack").setAttribute("aria-label", t("gWrist"));
 
-    var v = level(c.ratio, c.total);
-    var key = v.key === "vBad" && c.lmax < D.length.min ? "vBadShort" : v.key;
-    setText("#verdict", t(key, { tip: fmt(c.tip), lmax: c.lmax }));
-    $("#verdict").setAttribute("data-level", v.lv);
-    $("#pill").setAttribute("data-level", v.lv);
-    setText("#pill", v.key === "vBad" ? t("pillBad") : v.key === "vHeavy" ? t("pillHeavy") : v.lv === "warn" ? t("pillWarn") : t("pillGood"));
+    var ev = evaluate(c);
+    setCheck("vRod", ev.rod); setCheck("vWrist", ev.wrist); setCheck("vGrip", ev.grip);
+    $("#pill").setAttribute("data-level", ev.worst);
+    setText("#pill", ev.worst === "bad" ? t("pillBad") : ev.worst === "warn" ? t("pillWarn") : t("pillGood"));
 
     renderParts(c);
     renderPrice();
@@ -459,12 +619,12 @@
   }
 
   function renderParts(c) {
-    var rows = [];
-    rows.push(partRow("rod-" + c.m.id, nm(c.m), t("cutTo", { len: state.length }), c.m.kw));
-    rows.push(partRow("handle-" + c.h.id, t("handleLine", { handle: nm(c.h) }), "", c.h.kw));
+    var rows = [], counts = countBy(state);
+    rows.push(partRow("rod-" + c.m.id + "-" + state.rodD, t("rodPart", { mat: nm(c.m), d: state.rodD }), t("cutTo", { len: state.length }), c.m.kw.split("{d}").join(state.rodD)));
+    if (!c.h.bare) rows.push(partRow("handle-" + c.h.id, t("handleLine", { handle: nm(c.h) }), t("handlePartSpec", { len: state.handleLen }), c.h.kw));
     rows.push(partRow("line-" + c.ln.id, nm(c.ln), t("lenOnly", { len: state.strLen }), c.ln.kw));
     D.toys.forEach(function (toy) {
-      var q = state.items[toy.id] || 0;
+      var q = counts[toy.id] || 0;
       if (q) rows.push(partRow("toy-" + toy.id, nm(toy), t("pieces", { q: q }), toy.kw));
     });
     $("#partsList").innerHTML = rows.join("");
@@ -517,13 +677,16 @@
 
   /* order */
   function orderText() {
-    var c = calc(state), p = prices(state), items = [];
-    D.toys.forEach(function (toy) { var q = state.items[toy.id] || 0; if (q) items.push(nm(toy) + " × " + q); });
+    var c = calc(state), p = prices(state), items = [], counts = countBy(state);
+    D.toys.forEach(function (toy) {
+      var at = state.items.filter(function (it) { return it.id === toy.id; }).map(function (it) { return it.at >= state.strLen ? t("atEnd") : t("atFrom", { at: it.at }); });
+      if (at.length) items.push(nm(toy) + " × " + counts[toy.id] + " (" + at.join(", ") + ")");
+    });
     var L = [t("orderHead"), "",
-      t("oSpec") + ": " + t("headline", { mat: nm(c.m), len: state.length }),
-      t("handleLine", { handle: nm(c.h) }) + ", " + t("lineLine", { line: nm(c.ln), len: state.strLen }),
-      t("oItems") + ": " + (items.length ? items.join(", ") : t("oNone")),
-      t("spec", { total: fmt(c.total), tip: fmt(c.tip) }),
+      t("oSpec") + ": " + t("headline", { mat: nm(c.m), len: state.length }) + ", " + state.rodD + " " + t("mm"),
+      t("handleLine", { handle: nm(c.h) }) + " " + state.handleLen + " " + t("cm") + ", " + t("lineLine", { line: nm(c.ln), len: state.strLen }),
+      t("oItems") + ": " + (items.length ? items.join("; ") : t("oNone")),
+      t("spec", { total: fmt(c.total), bal: fmt(c.balance) }),
       t("oTotal") + ": " + p.total + " " + t("baht"), "",
       t("oShip") + ": " + $("#fName").value.trim(),
       t("oPhone") + ": " + $("#fPhone").value.trim(),
@@ -547,6 +710,22 @@
   }
 
   /* ---------------- events ---------------- */
+  // Apply a control that changes the design. Returns false if the control is not one of them.
+  function applyControl(el) {
+    var n = el.name;
+    if (n === "material") { state.material = el.value; state.rodD = find(D.materials, el.value).dDef; }
+    else if (n === "rodD") state.rodD = +el.value;
+    else if (n === "handle") state.handle = el.value;
+    else if (n === "strType") state.strType = el.value;
+    else if (n === "cat") state.cat = el.value;
+    else if (el.id === "lenRange") state.length = snap(+el.value, D.length);
+    else if (el.id === "lineRange") setStrLen(snap(+el.value, D.line));
+    else if (el.id === "hlRange") state.handleLen = snap(+el.value, D.handleLen);
+    else if (el.id === "personRange") state.person = snap(+el.value, D.person);
+    else return false;
+    return true;
+  }
+
   function bind() {
     $("#langBtn").addEventListener("click", function () {
       lang = lang === "th" ? "en" : "th";
@@ -556,32 +735,39 @@
 
     var panel = $("#panel");
     panel.addEventListener("change", function (e) {
-      var n = e.target.name;
-      if (n === "material") state.material = e.target.value;
-      else if (n === "handle") state.handle = e.target.value;
-      else if (n === "strType") state.strType = e.target.value;
-      else if (n === "cat") state.cat = e.target.value;
-      else if (e.target.id === "personRange") state.person = snap(+e.target.value, D.person);
-      else if (e.target.id === "lenRange") state.length = snap(+e.target.value, D.length);
-      else if (e.target.id === "lineRange") state.strLen = snap(+e.target.value, D.line);
-      else if (e.target.getAttribute && e.target.getAttribute("data-chk")) { checked[e.target.getAttribute("data-chk")] = e.target.checked; return; }
-      else return;
-      update(true);
+      var el = e.target;
+      if (el.hasAttribute("data-pos")) {
+        state.items[+el.getAttribute("data-pos")].at = clamp(Math.round(+el.value), 0, state.strLen);
+        update(true); return;
+      }
+      if (el.getAttribute("data-chk")) { checked[el.getAttribute("data-chk")] = el.checked; return; }
+      if (applyControl(el)) update(true);
     });
     panel.addEventListener("input", function (e) {
-      if (e.target.id === "lenRange") { state.length = snap(+e.target.value, D.length); update(false); }
-      else if (e.target.id === "lineRange") { state.strLen = snap(+e.target.value, D.line); update(false); }
-      else if (e.target.id === "personRange") { state.person = snap(+e.target.value, D.person); update(false); }
+      var el = e.target;
+      if (el.hasAttribute("data-pos")) {
+        state.items[+el.getAttribute("data-pos")].at = clamp(Math.round(+el.value), 0, state.strLen);
+        update(false); return;
+      }
+      if (el.type === "range" && applyControl(el)) update(false);
     });
 
     $("#toyGrid").addEventListener("click", function (e) {
       var b = e.target.closest("button[data-act]");
       if (!b || b.disabled) return;
-      var id = b.getAttribute("data-id"), q = state.items[id] || 0;
-      if (b.getAttribute("data-act") === "inc" && count(state) < C.MAX_ATTACH) q++;
-      else if (b.getAttribute("data-act") === "dec" && q > 0) q--;
-      if (q > 0) state.items[id] = q; else delete state.items[id];
+      var id = b.getAttribute("data-id"), k;
+      if (b.getAttribute("data-act") === "inc") {
+        if (state.items.length < C.MAX_ATTACH) state.items.push({ id: id, at: state.strLen });
+      } else {
+        for (k = state.items.length - 1; k >= 0; k--) if (state.items[k].id === id) { state.items.splice(k, 1); break; }
+      }
       update(true);
+    });
+
+    $("#itemList").addEventListener("click", function (e) {
+      var rm = e.target.closest("[data-rm]"), en = e.target.closest("[data-end]");
+      if (rm) { state.items.splice(+rm.getAttribute("data-rm"), 1); update(true); }
+      else if (en) { state.items[+en.getAttribute("data-end")].at = state.strLen; update(true); }
     });
 
     $("#stage").addEventListener("click", wiggle);
@@ -593,6 +779,10 @@
       setText("#stageToggle", picHidden ? t("showPic") : t("hidePic"));
     });
     $("#sizeFix").addEventListener("click", function () { state.length = sizeRange(state.person).mid; update(true); });
+
+    // coming-soon shortcuts
+    $("#soonSave").addEventListener("click", function () { $("#tab-save").click(); $("#designName").focus(); });
+    $("#soonShopee").addEventListener("click", function () { $("#tab-shopee").click(); });
 
     // tabs
     var tabs = ["save", "shopee", "order"];
@@ -633,10 +823,6 @@
       }
     });
 
-    // coming-soon shortcuts
-    $("#soonSave").addEventListener("click", function () { $("#tab-save").click(); $("#designName").focus(); });
-    $("#soonShopee").addEventListener("click", function () { $("#tab-shopee").click(); });
-
     // order
     $("#orderForm").addEventListener("submit", function (e) { e.preventDefault(); });
     $("#copyOrderBtn").addEventListener("click", function () {
@@ -654,11 +840,9 @@
 
   /* ---------------- init ---------------- */
   function init() {
-    var lr = $("#lenRange"), sr = $("#lineRange");
-    lr.min = D.length.min; lr.max = D.length.max; lr.step = D.length.step;
-    sr.min = D.line.min; sr.max = D.line.max; sr.step = D.line.step;
-    var pr = $("#personRange");
-    pr.min = D.person.min; pr.max = D.person.max; pr.step = D.person.step;
+    function range(sel, r) { var el = $(sel); el.min = r.min; el.max = r.max; el.step = r.step; }
+    range("#lenRange", D.length); range("#lineRange", D.line);
+    range("#hlRange", D.handleLen); range("#personRange", D.person);
     buildStatic(); buildLists(); bind(); update(true);
   }
   init();

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ไม้ตกแมว DIY</title>
-<meta name="description" content="ออกแบบไม้ตกแมวเอง เลือกความยาว วัสดุ ด้าม และตุ๊กตาที่ปลาย พร้อมเช็กน้ำหนัก แล้วบันทึก ซื้อเองที่ Shopee หรือสั่งให้ส่งถึงบ้าน">
+<meta name="description" content="ออกแบบไม้ตกแมวเอง เลือกความยาว วัสดุ ด้าม และตุ๊กตาที่ติดบนสาย พร้อมเช็กน้ำหนักที่ข้อมือและด้ามจับ แล้วบันทึก ซื้อเองที่ Shopee หรือสั่งให้ส่งถึงบ้าน">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai+Looped:wght@400;500;600&family=Mali:wght@500;700&display=swap" rel="stylesheet">
@@ -32,23 +32,45 @@
     </div>
 
     <div class="gauges">
-      <div class="gauge" id="gTip" data-level="good">
-        <div class="gHead"><span id="gTipLabel"></span><strong id="gTipVal"></strong></div>
-        <div class="track" id="gTipTrack" role="meter" aria-valuemin="0" aria-valuemax="130">
-          <div class="fill" id="gTipFill"></div>
+      <div class="gauge" id="gRod" data-level="good">
+        <div class="gHead"><span id="gRodLabel"></span><strong id="gRodVal"></strong></div>
+        <div class="track" id="gRodTrack" role="meter" aria-valuemin="0" aria-valuemax="130">
+          <div class="fill" id="gRodFill"></div>
           <div class="limitMark"></div>
         </div>
-        <p class="gNote" id="gTipNote"></p>
+        <p class="gNote" id="gRodNote"></p>
       </div>
-      <div class="gauge" id="gTotal" data-level="good">
-        <div class="gHead"><span id="gTotalLabel"></span><strong id="gTotalVal"></strong></div>
-        <div class="track" id="gTotalTrack" role="meter" aria-valuemin="0" aria-valuemax="100">
-          <div class="fill" id="gTotalFill"></div>
-          <div class="limitMark" id="gTotalMark"></div>
+      <div class="gauge" id="gWrist" data-level="good">
+        <div class="gHead"><span id="gWristLabel"></span><strong id="gWristVal"></strong></div>
+        <div class="track" id="gWristTrack" role="meter" aria-valuemin="0" aria-valuemax="130">
+          <div class="fill" id="gWristFill"></div>
+          <div class="limitMark limitMark--soft" id="gWristMarkGood"></div>
+          <div class="limitMark"></div>
         </div>
-        <p class="gNote" id="gTotalNote"></p>
+        <p class="gNote" id="gWristNote"></p>
       </div>
-      <p class="verdict" id="verdict" data-level="good" aria-live="polite"></p>
+
+      <div class="checks" aria-live="polite">
+        <p class="verdict" id="vRod" data-level="good"><b id="vRodL"></b><span id="vRodT"></span></p>
+        <p class="verdict" id="vWrist" data-level="good"><b id="vWristL"></b><span id="vWristT"></span></p>
+        <p class="verdict" id="vGrip" data-level="good"><b id="vGripL"></b><span id="vGripT"></span></p>
+      </div>
+
+      <details class="why">
+        <summary id="whySummary"></summary>
+        <ul>
+          <li id="why1"></li>
+          <li id="why2"></li>
+          <li id="why3"></li>
+          <li id="why4"></li>
+          <li id="why5"></li>
+        </ul>
+        <p class="fine"><span id="whySources"></span>:
+          <a href="https://www.ehstoday.com/health/ergonomics/ehs_imp_37964" target="_blank" rel="noopener">EHS Today</a>,
+          <a href="https://iloencyclopaedia.org/part-iv-66769/ergonomics-52353/work-systems-design/item/634-tools" target="_blank" rel="noopener">ILO Encyclopaedia</a>,
+          <a href="https://maddiesfund.org/kb-cat-toys-and-cat-play.htm" target="_blank" rel="noopener">Maddie's Fund</a>
+        </p>
+      </details>
     </div>
   </section>
 
@@ -63,6 +85,8 @@
       <div class="rangeEnds"><span id="lenMin"></span><span id="lenMax"></span></div>
       <p class="groupLabel" id="matLabel"></p>
       <div class="opts" id="matOpts" role="radiogroup" aria-labelledby="matLabel"></div>
+      <p class="groupLabel" id="thickLabel"></p>
+      <div class="opts opts--sizes" id="thickOpts" role="radiogroup" aria-labelledby="thickLabel"></div>
     </fieldset>
 
     <fieldset class="step sizeStep">
@@ -85,6 +109,12 @@
 
     <fieldset class="step">
       <legend><span class="stepNum">2</span><span id="s2"></span></legend>
+      <div class="sliderRow">
+        <label for="hlRange" id="hlLabel"></label>
+        <output id="hlOut" for="hlRange"></output>
+      </div>
+      <input type="range" id="hlRange" class="range">
+      <div class="rangeEnds"><span id="hlMin"></span><span id="hlMax"></span></div>
       <div class="opts opts--chips" id="handleOpts" role="radiogroup" aria-labelledby="s2"></div>
     </fieldset>
 
@@ -104,6 +134,8 @@
       <legend><span class="stepNum">4</span><span id="s4"></span></legend>
       <p class="slots" id="slots" aria-live="polite"></p>
       <div class="toyGrid" id="toyGrid"></div>
+      <h3 class="subhead" id="itemsTitle"></h3>
+      <ul class="itemList" id="itemList"></ul>
       <p class="safety" id="safety"></p>
     </fieldset>
 
