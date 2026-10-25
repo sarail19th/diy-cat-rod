@@ -43,7 +43,7 @@ Three separate checks, because a heavy wand and a wand that is hard to hold are 
 - **Wrist.** Felt weight = torque about the grip divided by `WRIST_ARM` (30 cm, about a forearm). The wand is played in short bursts of flicking, not held for hours like a fishing rod, so this is a conservative target of `WRIST_GOOD` 50 g (comfortable) and `WRIST_MAX` 100 g (tires quickly). **These two numbers are my own conservative choices, not a published standard.** They sit well under the 500 g that hand-tool ergonomics guidance allows for precision tools. Change them in `data.js`.
 - **Grip.** Handle diameter (about 25 to 35 mm is comfortable; under 10 mm forces a weak pinch grip), handle length (at least 10 cm, wider than a palm) and slippery covers.
 
-Toys can hang anywhere along the line, not only at the end. A toy partway along adds weight at that point, so it counts less toward rod flex's tip load only through the torque it adds; the model still counts all line and toy weight at the tip for flex, which is the safe side.
+Toys can hang anywhere along the line, not only at the end. For rod flex the model counts all line and toy weight at the tip, which is the safe side. For the wrist it counts the whole wand's weight about the grip.
 
 Sources: EHS Today and ILO Encyclopaedia (hand-tool ergonomics), Maddie's Fund (cat play).
 
