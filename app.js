@@ -28,7 +28,7 @@
   function defaults() {
     return {
       length: D.length.def, material: "bamboo", rodD: 4,
-      handle: "foam", handleLen: D.handleLen.def,
+      handle: "foam", hMode: "cover", handleLen: D.handleLen.def,
       strLen: D.line.def, strType: "cotton",
       person: D.person.def, cat: "adult",
       items: [{ id: "fish", at: D.line.def }, { id: "ribbon", at: 22 }]
@@ -38,7 +38,7 @@
   function serialize(s) {
     var items = s.items.map(function (it) { return it.id + "." + it.at; }).join(",");
     return new URLSearchParams({
-      l: s.length, m: s.material, d: s.rodD, h: s.handle, hl: s.handleLen,
+      l: s.length, m: s.material, d: s.rodD, h: s.handle, hm: s.hMode, hl: s.handleLen,
       sl: s.strLen, st: s.strType, ph: s.person, cs: s.cat, i: items
     }).toString();
   }
@@ -52,6 +52,7 @@
     var m = find(D.materials, s.material), d = parseFloat(q.get("d"));
     s.rodD = m.sizes.indexOf(d) >= 0 ? d : m.dDef;
     if (find(D.handles, q.get("h"))) s.handle = q.get("h");
+    s.hMode = q.get("hm") === "joined" ? "joined" : "cover";
     s.handleLen = snap(parseFloat(q.get("hl")) || D.handleLen.def, D.handleLen);
     s.strLen = snap(parseFloat(q.get("sl")) || D.line.def, D.line);
     if (find(D.lines, q.get("st"))) s.strType = q.get("st");
@@ -98,29 +99,35 @@
   function calc(s) {
     var m = find(D.materials, s.material), h = find(D.handles, s.handle), ln = find(D.lines, s.strType);
     var sp = rodSpec(m, s.rodD);
-    var rod = s.length * sp.gpc, hand = (h.bare ? sp.gpc : h.gpc) * s.handleLen;
+    // cover: the handle is a sleeve on the rod, so the rod is one piece and the sleeve adds no length.
+    // joined: a separate handle is attached behind the rod and adds length (and a weak joint).
+    var joined = s.hMode === "joined" && !h.bare;
+    var rod = s.length * sp.gpc, hand = h.bare ? 0 : h.gpc * s.handleLen;
+    var free = joined ? s.length : Math.max(s.length - s.handleLen, 10);   // rod in front of the grip
     var str = s.strLen * ln.gpcm, toys = 0;
     s.items.forEach(function (it) { toys += find(D.toys, it.id).g; });
     var tip = str + toys, total = rod + hand + tip;
-    var limit = flexLimit(sp.EI, s.length);
+    var limit = flexLimit(sp.EI, free);
 
     // Torque about the middle of the handle with the wand held level. The handle itself
     // is centred on the grip so it adds weight but no torque.
-    var g2b = s.handleLen / 2;
-    var moment = rod * (g2b + s.length / 2) + tip * (g2b + s.length);       // g cm
+    var g2b = s.handleLen / 2, moment;
+    if (joined) moment = rod * (g2b + s.length / 2) + tip * (g2b + s.length);                       // g cm
+    else moment = sp.gpc * s.length * free / 2 + tip * (s.length - g2b);
 
     var thick = null;
     if (tip / limit > 1) {
       for (var i = 0; i < m.sizes.length; i++) {
-        if (m.sizes[i] > s.rodD && flexLimit(rodSpec(m, m.sizes[i]).EI, s.length) * 0.7 >= tip) { thick = m.sizes[i]; break; }
+        if (m.sizes[i] > s.rodD && flexLimit(rodSpec(m, m.sizes[i]).EI, free) * 0.7 >= tip) { thick = m.sizes[i]; break; }
       }
     }
     return {
       m: m, h: h, ln: ln, sp: sp, rod: rod, hand: hand, str: str, toys: toys, tip: tip, total: total,
       limit: limit, ratio: tip / limit,
-      lmax: Math.floor(maxLenFor(sp.EI, tip) / D.length.step) * D.length.step,
+      lmax: Math.floor((maxLenFor(sp.EI, tip) + (joined ? 0 : s.length - free)) / D.length.step) * D.length.step,
       moment: moment, felt: moment / C.WRIST_ARM, balance: moment / total,
-      gripD: h.bare ? s.rodD : h.d, n: s.items.length, thick: thick
+      gripD: h.bare ? s.rodD : h.d, n: s.items.length, thick: thick, joined: joined, free: free,
+      totalLen: s.length + (joined ? s.handleLen : 0)
     };
   }
 
@@ -140,6 +147,10 @@
     else if (gd < 25) { gl = "warn"; msgs.push(t("gripThin", { d: fmt(gd) })); }
     if (hl < 10) { gl = "bad"; msgs.push(t("gripShort", { len: hl })); }
     else if (hl < 12) { if (gl === "good") gl = "warn"; msgs.push(t("gripShortWarn", { len: hl })); }
+    if (c.joined) {
+      if (gl === "good") gl = "warn";
+      msgs.push(t("gripJoint", { d: fmt(state.rodD) }));
+    }
     if (c.h.slick) { if (gl === "good") gl = "warn"; msgs.push(t("gripSlick")); }
     grip = { lv: gl, text: msgs.length ? msgs.join(" ") : t("gripGood", { d: fmt(gd), len: hl }) };
 
@@ -294,13 +305,17 @@
     }
 
     // handle (length follows the slider, up to what fits on screen)
-    var HPX = clamp(100 * state.handleLen / 14, 56, 112);
+    var HPX = c.joined ? clamp(100 * state.handleLen / 14, 56, 112) : clamp(rodPx * state.handleLen / L, 30, 140);
+    var hshift = c.joined ? 0 : HPX - 8;   // a sleeve sits on the rod; a joined handle sits behind it
     var hw2 = c.h.bare ? 9 : clamp(8 + c.gripD * 0.55, 11, 26), hcol = c.h.bare ? c.m.color : c.h.color;
-    svg += '<g transform="translate(' + X0 + "," + Y0 + ') rotate(-26)">' +
+    svg += '<g transform="translate(' + X0 + "," + Y0 + ') rotate(-26)"><g transform="translate(' + hshift + ',0)">' +
       '<clipPath id="hclip"><rect x="' + -HPX + '" y="' + -hw2 / 2 + '" width="' + (HPX + 8) + '" height="' + hw2 + '" rx="' + hw2 / 2 + '"/></clipPath>' +
       '<rect x="' + -HPX + '" y="' + -hw2 / 2 + '" width="' + (HPX + 8) + '" height="' + hw2 + '" rx="' + hw2 / 2 + '" fill="' + hcol + '"/>' +
       '<g clip-path="url(#hclip)">' + handleDecor(c.h.id, hw2, HPX) + "</g>" +
-      '<rect x="' + -HPX + '" y="' + -hw2 / 2 + '" width="' + (HPX + 8) + '" height="' + hw2 + '" rx="' + hw2 / 2 + '" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.2"/></g>';
+      '<rect x="' + -HPX + '" y="' + -hw2 / 2 + '" width="' + (HPX + 8) + '" height="' + hw2 + '" rx="' + hw2 / 2 + '" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.2"/></g></g>';
+    if (c.joined) {
+      svg += '<g transform="translate(' + X0 + "," + Y0 + ') rotate(-26)"><rect x="-4" y="-7" width="8" height="14" rx="2" fill="none" stroke="#F4B63F" stroke-width="2" stroke-dasharray="3 2"/></g>';
+    }
 
     // line and toys at their positions along it
     var tip = pts[N], spx = state.strLen * 1.6;
@@ -366,7 +381,7 @@
     // wand held at the hand: handle behind, rod L cm ahead, 22 degrees up
     var a = -22 * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a);
     var bx = hx - hl * ca, by = hy - hl * sa, fx = hx + 3 * ca, fy = hy + 3 * sa;
-    var tx = hx + L * ca, ty = hy + L * sa;
+    var tx = hx + (c.joined ? L : L - hl) * ca, ty = hy + (c.joined ? L : L - hl) * sa;
     var hw = Math.max(1.6, c.gripD / 10), hcol = c.h.bare ? c.m.color : c.h.color;
     s += '<line x1="' + bx.toFixed(1) + '" y1="' + by.toFixed(1) + '" x2="' + fx.toFixed(1) + '" y2="' + fy.toFixed(1) + '" stroke="rgba(27,35,71,.55)" stroke-width="' + (hw + 1.2).toFixed(1) + '" stroke-linecap="round"/>' +
       '<line x1="' + bx.toFixed(1) + '" y1="' + by.toFixed(1) + '" x2="' + fx.toFixed(1) + '" y2="' + fy.toFixed(1) + '" stroke="' + hcol + '" stroke-width="' + hw.toFixed(1) + '" stroke-linecap="round"/>' +
@@ -375,7 +390,8 @@
 
     // length ruler above the rod
     var nx = sa, ny = -ca, off = 10;
-    var rsx = hx + nx * off, rsy = hy + ny * off, rex = rsx + L * ca, rey = rsy + L * sa;
+    var ox = c.joined ? hx : bx, oy = c.joined ? hy : by;
+    var rsx = ox + nx * off, rsy = oy + ny * off, rex = rsx + L * ca, rey = rsy + L * sa;
     var mx = (rsx + rex) / 2 + nx * 6, my = (rsy + rey) / 2 + ny * 6;
     s += '<g stroke="' + ink + '" stroke-width=".8" fill="none"><line x1="' + rsx.toFixed(1) + '" y1="' + rsy.toFixed(1) + '" x2="' + rex.toFixed(1) + '" y2="' + rey.toFixed(1) + '" stroke-dasharray="3 3"/>' +
       '<line x1="' + (rsx - nx * 3).toFixed(1) + '" y1="' + (rsy - ny * 3).toFixed(1) + '" x2="' + (rsx + nx * 3).toFixed(1) + '" y2="' + (rsy + ny * 3).toFixed(1) + '"/>' +
@@ -430,7 +446,7 @@
     setText("#gRodLabel", t("gRod"));
     setText("#gWristLabel", t("gWrist"));
     setText("#vRodL", t("chkRod") + " "); setText("#vWristL", t("chkWrist") + " "); setText("#vGripL", t("chkGrip") + " ");
-    ["s1", "s2", "s3", "s4", "s5", "lenLabel", "matLabel", "thickLabel", "lineLenLabel", "lineTypeLabel", "safety",
+    ["s1", "s2", "s3", "s4", "s5", "lenLabel", "matLabel", "thickLabel", "lineLenLabel", "hModeLabel", "lineTypeLabel", "safety",
       "nameLabel", "myDesignsTitle", "shopeeIntro", "partsTitle", "suppliesTitle", "stepsTitle", "affiliateNote",
       "priceTitle", "priceNote", "foot", "sizeTitle", "sizeIntro", "personLabel", "catLabel", "hlLabel", "itemsTitle",
       "whySummary", "why1", "why2", "why3", "why5", "whySources"].forEach(function (k) {
@@ -470,6 +486,10 @@
     $("#matOpts").innerHTML = D.materials.map(function (o) { return radio("material", o, "mat"); }).join("");
     $("#handleOpts").innerHTML = D.handles.map(function (o) {
       return radio("handle", o, "handle", o.feel[lang] + (o.d ? " Ø " + o.d + " " + t("mm") : ""));
+    }).join("");
+    $("#hModeOpts").innerHTML = ["cover", "joined"].map(function (id) {
+      return '<label class="opt"><input type="radio" name="hMode" value="' + id + '"><span class="optText"><b>' + esc(t("hm_" + id)) +
+        "</b><small>" + esc(t("hm_" + id + "_s")) + "</small></span></label>";
     }).join("");
     $("#lineOpts").innerHTML = D.lines.map(function (o) { return radio("strType", o, "line"); }).join("");
     $("#catOpts").innerHTML = D.cats.map(function (o) {
@@ -548,7 +568,7 @@
     setText("#lineOut", state.strLen + " " + t("cm"));
     setText("#hlOut", state.handleLen + " " + t("cm"));
     setText("#personOut", state.person + " " + t("cm"));
-    [["material", state.material], ["rodD", state.rodD], ["handle", state.handle], ["strType", state.strType], ["cat", state.cat]].forEach(function (p) {
+    [["material", state.material], ["rodD", state.rodD], ["handle", state.handle], ["hMode", state.hMode], ["strType", state.strType], ["cat", state.cat]].forEach(function (p) {
       var inputs = document.querySelectorAll('input[name="' + p[0] + '"]');
       for (i = 0; i < inputs.length; i++) inputs[i].checked = inputs[i].value === String(p[1]);
     });
@@ -561,7 +581,7 @@
         txt = t("weightAtLen", { w: fmt(state.length * rodSpec(mm, id === state.material ? state.rodD : mm.dDef).gpc) });
       } else if (kind === "handle") {
         var hh = find(D.handles, id);
-        txt = fmt((hh.bare ? c.sp.gpc : hh.gpc) * state.handleLen) + " g";
+        txt = fmt((hh.bare ? 0 : hh.gpc) * state.handleLen) + " g";
       } else if (kind === "line") txt = t("weightAtLen", { w: fmt(state.strLen * find(D.lines, id).gpcm) });
       else if (kind === "toy") txt = fmt(find(D.toys, id).g) + " g";
       ws[i].textContent = txt;
@@ -578,6 +598,9 @@
     setText("#slots", full ? t("slotsFull", { max: C.MAX_ATTACH }) : t("slotsLeft", { n: C.MAX_ATTACH - c.n }));
     renderItems();
 
+    $("#hModeBox").hidden = !!c.h.bare;
+    setText("#hmNote", c.h.bare ? t("hmNoteBare", { len: state.length }) :
+      t(c.joined ? "hmNoteJoined" : "hmNoteCover", { total: c.totalLen, len: state.length, hl: state.handleLen, free: c.free }));
     setText("#headline", t("headline", { mat: nm(c.m), len: state.length }));
     setText("#specLine", t("spec", { total: fmt(c.total), bal: fmt(c.balance) }));
     renderStage(c, !!doSwing);
@@ -621,7 +644,7 @@
   function renderParts(c) {
     var rows = [], counts = countBy(state);
     rows.push(partRow("rod-" + c.m.id + "-" + state.rodD, t("rodPart", { mat: nm(c.m), d: state.rodD }), t("cutTo", { len: state.length }), c.m.kw.split("{d}").join(state.rodD)));
-    if (!c.h.bare) rows.push(partRow("handle-" + c.h.id, t("handleLine", { handle: nm(c.h) }), t("handlePartSpec", { len: state.handleLen }), c.h.kw));
+    if (!c.h.bare) rows.push(partRow("handle-" + c.h.id, t("handleLine", { handle: nm(c.h) }), t(c.joined ? "handlePartJoined" : "handlePartSpec", { len: state.handleLen }), c.h.kw));
     rows.push(partRow("line-" + c.ln.id, nm(c.ln), t("lenOnly", { len: state.strLen }), c.ln.kw));
     D.toys.forEach(function (toy) {
       var q = counts[toy.id] || 0;
@@ -684,7 +707,7 @@
     });
     var L = [t("orderHead"), "",
       t("oSpec") + ": " + t("headline", { mat: nm(c.m), len: state.length }) + ", " + state.rodD + " " + t("mm"),
-      t("handleLine", { handle: nm(c.h) }) + " " + state.handleLen + " " + t("cm") + ", " + t("lineLine", { line: nm(c.ln), len: state.strLen }),
+      t("handleLine", { handle: nm(c.h) }) + " " + state.handleLen + " " + t("cm") + (c.h.bare ? "" : " (" + t(c.joined ? "hm_joined" : "hm_cover") + ")") + ", " + t("lineLine", { line: nm(c.ln), len: state.strLen }),
       t("oItems") + ": " + (items.length ? items.join("; ") : t("oNone")),
       t("spec", { total: fmt(c.total), bal: fmt(c.balance) }),
       t("oTotal") + ": " + p.total + " " + t("baht"), "",
@@ -716,6 +739,7 @@
     if (n === "material") { state.material = el.value; state.rodD = find(D.materials, el.value).dDef; }
     else if (n === "rodD") state.rodD = +el.value;
     else if (n === "handle") state.handle = el.value;
+    else if (n === "hMode") state.hMode = el.value;
     else if (n === "strType") state.strType = el.value;
     else if (n === "cat") state.cat = el.value;
     else if (el.id === "lenRange") state.length = snap(+el.value, D.length);
