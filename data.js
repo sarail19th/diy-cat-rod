@@ -40,13 +40,13 @@ window.CATALOG = {
   line: { min: 20, max: 80, step: 5, def: 40 },
   handleLen: { min: 8, max: 20, step: 1, def: 14 },
 
-  // Size guide. Person height range in cm. Cats: k scales a typical cat
-  // (about 40 cm chest to rump); body is that length in cm.
+  // Size guide. Person height range in cm. Cats are grouped by weight (kg);
+  // k scales a typical adult cat (about 40 cm chest to rump), body is that length in cm.
   person: { min: 140, max: 190, step: 5, def: 160 },
   cats: [
-    { id: "kitten", k: 0.55, body: 22, name: { th: "ลูกแมว", en: "Kitten" } },
-    { id: "adult", k: 1, body: 40, name: { th: "แมวทั่วไป", en: "Typical cat" } },
-    { id: "large", k: 1.3, body: 52, name: { th: "แมวตัวใหญ่", en: "Large cat" } }
+    { id: "kitten", k: 0.55, body: 22, kg: "1–3", name: { th: "ลูกแมว", en: "Kitten" } },
+    { id: "adult", k: 1, body: 40, kg: "3.5–5", name: { th: "แมวโต", en: "Adult cat" } },
+    { id: "large", k: 1.3, body: 52, kg: "6+", name: { th: "แมวตัวใหญ่", en: "Large cat" } }
   ],
 
   // Rods. sizes = outer diameters in mm you can buy. wall = tube wall in mm

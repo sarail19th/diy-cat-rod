@@ -474,7 +474,7 @@
     $("#lineOpts").innerHTML = D.lines.map(function (o) { return radio("strType", o, "line"); }).join("");
     $("#catOpts").innerHTML = D.cats.map(function (o) {
       return '<label class="opt"><input type="radio" name="cat" value="' + o.id + '"><span class="optText"><b>' + esc(nm(o)) +
-        "</b><small>" + esc(t("catBody", { b: o.body })) + "</small></span></label>";
+        "</b><small>" + esc(t("catBody", { b: o.body, kg: o.kg })) + "</small></span></label>";
     }).join("");
     $("#toyGrid").innerHTML = D.toys.map(function (o) {
       return '<div class="toy" data-toy="' + o.id + '"><svg viewBox="-26 -2 52 54" aria-hidden="true">' + TOY[o.id] + "</svg>" +
