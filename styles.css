@@ -20,6 +20,8 @@
 
 html { -webkit-text-size-adjust: 100%; }
 
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--mist); }
+
 body {
   margin: 0;
   background: var(--mist);
@@ -44,7 +46,7 @@ button, input, textarea { font: inherit; color: inherit; }
 /* ---------- header ---------- */
 .top {
   display: flex; align-items: center; justify-content: space-between;
-  max-width: 1240px; margin: 0 auto; padding: 14px 16px 6px;
+  max-width: 1240px; margin: 0 auto; padding-block: 14px 6px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
 }
 .brand { font-family: var(--font-display); font-weight: 700; font-size: 20px; }
 .langBtn {
@@ -56,7 +58,7 @@ button, input, textarea { font: inherit; color: inherit; }
 /* ---------- layout ---------- */
 .builder {
   display: flex; flex-direction: column; gap: 14px;
-  max-width: 1240px; margin: 0 auto; padding: 0 16px 24px;
+  max-width: 1240px; margin: 0 auto; padding-block: 0 24px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
 }
 .left { display: contents; }
 
@@ -67,7 +69,7 @@ button, input, textarea { font: inherit; color: inherit; }
 
 /* ---------- stage (the memorable part) ---------- */
 .stage {
-  position: sticky; top: 0; z-index: 10;
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 10;
   background: var(--felt);
   color: #fff;
   border-radius: 28px;
@@ -255,10 +257,10 @@ button, input, textarea { font: inherit; color: inherit; }
 
 .error { color: var(--pink-text); font-weight: 500; margin-bottom: 10px; }
 
-.foot { max-width: 1240px; margin: 0 auto; padding: 8px 16px 32px; font-size: 13px; color: var(--ink-soft); }
+.foot { max-width: 1240px; margin: 0 auto; padding-block: 8px 32px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); font-size: 13px; color: var(--ink-soft); }
 
 .toast {
-  position: fixed; left: 50%; bottom: 22px; transform: translate(-50%, 30px); opacity: 0;
+  position: fixed; left: 50%; bottom: calc(22px + env(safe-area-inset-bottom, 0px)); transform: translate(-50%, 30px); opacity: 0;
   background: var(--ink); color: #fff; padding: 10px 20px; border-radius: 999px; font-weight: 500;
   pointer-events: none; transition: transform .25s, opacity .25s; z-index: 60;
 }
