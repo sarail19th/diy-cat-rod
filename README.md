@@ -1,6 +1,8 @@
 # ไม้ตกแมว DIY (DIY Cat Wand Builder)
 
-A static website where cat owners design their own cat teaser wand. Pick rod length, material, handle, line and tip toys. The live drawing bends under load, and two gauges show tip load and total weight so people know if the build is too heavy.
+> Static web app for designing your own DIY cat teaser wand. Pick the rod, handle, line and toys, and the live preview bends under load and checks the weight. Compare size against a person and a cat, then shop the parts on Shopee. Thai and English.
+
+Cat owners pick rod length, material, handle, line and tip toys. The live drawing bends under load, and two gauges show tip load and total weight so people know if the build is too heavy.
 
 When the design is done, the visitor can:
 
