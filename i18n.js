@@ -242,7 +242,8 @@ window.I18N = {
     oLine: "LINE",
     oNote: "หมายเหตุ",
 
-    foot: "ค่าน้ำหนักและความแข็งของก้านเป็นค่าประมาณเพื่อช่วยตัดสินใจ ไม่ใช่ผลทดสอบจากห้องแล็บ"
+    foot: "ค่าน้ำหนักและความแข็งของก้านเป็นค่าประมาณเพื่อช่วยตัดสินใจ ไม่ใช่ผลทดสอบจากห้องแล็บ",
+    srcLink: "ซอร์สโค้ดบน GitHub"
   },
 
   en: {
@@ -488,6 +489,7 @@ window.I18N = {
     oLine: "LINE",
     oNote: "Note",
 
-    foot: "Weights and stiffness are estimates to help you decide, not lab test results."
+    foot: "Weights and stiffness are estimates to help you decide, not lab test results.",
+    srcLink: "Source on GitHub"
   }
 };

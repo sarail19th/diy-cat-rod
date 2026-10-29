@@ -299,6 +299,9 @@ button, input, textarea { font: inherit; color: inherit; }
 
 .error { color: var(--pink-text); font-weight: 500; margin-bottom: 10px; }
 
+.srcfoot { max-width: 1240px; margin: 0 auto; padding-block: 0 32px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); font-size: 13px; color: var(--ink-soft); }
+.srcfoot a { color: inherit; text-decoration: underline; }
+#foot.foot { padding-bottom: 6px; }
 .foot { max-width: 1240px; margin: 0 auto; padding-block: 8px 32px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); font-size: 13px; color: var(--ink-soft); }
 
 .toast {
@@ -468,7 +471,7 @@ button, input, textarea { font: inherit; color: inherit; }
 
 /* wide screens: both pictures side by side, no toggle */
 @media (min-width: 1240px) {
-  .top, .builder, .foot { max-width: 1400px; }
+  .top, .builder, .foot, .srcfoot { max-width: 1400px; }
   .viewTabs { display: none; }
   .views, .views[data-view] { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 14px; align-items: start; }
   .views[data-view] .stage, .views[data-view] .scaleCard { display: block; }

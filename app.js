@@ -696,7 +696,7 @@
     setText("#vCatL", t("chkCat") + " "); setText("#vRodL", t("chkRod") + " "); setText("#vWristL", t("chkWrist") + " "); setText("#vGripL", t("chkGrip") + " ");
     ["s1", "s2", "s3", "s4", "s5", "lenLabel", "matLabel", "thickLabel", "lineLenLabel", "hModeLabel", "hookLabel", "hookNote", "lineNote", "lineTypeLabel", "safetyTitle", "safeSrcL", "estTitle", "estNote", "estMoreS",
       "nameLabel", "myDesignsTitle", "shopeeIntro", "partsTitle", "suppliesTitle", "stepsTitle", "affiliateNote",
-      "priceTitle", "priceNote", "foot", "sizeTitle", "sizeIntro", "personLabel", "catLabel", "hlLabel", "itemsTitle",
+      "priceTitle", "priceNote", "foot", "srcLink", "sizeTitle", "sizeIntro", "personLabel", "catLabel", "hlLabel", "itemsTitle",
       "whySummary", "why1", "why2", "why3", "why5", "whySources", "rodColorLabel", "rodColorNote", "handleColorLabel", "lineColorLabel", "marketHandle", "marketSrcL", "scaleTitle"].forEach(function (k) {
       var el = $("#" + k);
       if (el) el.textContent = t(k === "affiliateNote" ? "affiliate" : k);
